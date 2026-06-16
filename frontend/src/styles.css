@@ -1,0 +1,323 @@
+:root {
+  color: #172026;
+  background: #f5f7f4;
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button {
+  border: 0;
+  border-radius: 8px;
+  background: #176b87;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  min-height: 40px;
+  padding: 0 16px;
+}
+
+button.secondary {
+  background: #d8751b;
+}
+
+.appShell {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.sidebar {
+  background: #182526;
+  color: #f7fbf6;
+  padding: 24px;
+}
+
+.brand {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.brand > span {
+  align-items: center;
+  background: #f6c85f;
+  border-radius: 8px;
+  color: #172026;
+  display: grid;
+  font-weight: 900;
+  height: 42px;
+  place-items: center;
+  width: 42px;
+}
+
+.brand strong,
+.brand small {
+  display: block;
+}
+
+.brand small {
+  color: #a9bbb8;
+  margin-top: 3px;
+}
+
+nav {
+  display: grid;
+  gap: 8px;
+}
+
+nav button {
+  background: transparent;
+  color: #dce8e5;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+nav button.active,
+nav button:hover {
+  background: #2d4547;
+  color: #ffffff;
+}
+
+main {
+  padding: 28px;
+}
+
+.topbar {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  font-size: 30px;
+  margin-bottom: 0;
+}
+
+h2 {
+  font-size: 24px;
+  margin-bottom: 0;
+}
+
+h3 {
+  font-size: 16px;
+  margin-bottom: 12px;
+}
+
+.eyebrow {
+  color: #52615f;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.statusPill {
+  background: #e2f2df;
+  border: 1px solid #b9d6b0;
+  border-radius: 999px;
+  color: #31582c;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 8px 12px;
+  white-space: nowrap;
+}
+
+.section {
+  background: #ffffff;
+  border: 1px solid #d8e0dd;
+  border-radius: 8px;
+  padding: 22px;
+}
+
+.sectionHeader {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.sectionActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.metrics {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 22px;
+}
+
+.metrics div,
+.itemList article,
+.workflowItem {
+  border: 1px solid #d9e1df;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.metrics span,
+.itemList span,
+.workflowItem small,
+.muted {
+  color: #60706d;
+  font-size: 13px;
+}
+
+.metrics strong {
+  display: block;
+  margin-top: 6px;
+}
+
+.twoColumn,
+.split {
+  display: grid;
+  gap: 18px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.tagRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tagRow span {
+  background: #eef3f8;
+  border: 1px solid #cfdae6;
+  border-radius: 999px;
+  color: #244c6b;
+  padding: 6px 10px;
+}
+
+.plainList {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.plainList li {
+  margin-bottom: 8px;
+}
+
+.itemList {
+  display: grid;
+  gap: 10px;
+}
+
+.itemList strong,
+.itemList span {
+  display: block;
+}
+
+.itemList p {
+  margin-bottom: 0;
+  margin-top: 8px;
+}
+
+.resultBox {
+  background: #172026;
+  border-radius: 8px;
+  color: #f5f7f4;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 18px 0 0;
+  min-height: 140px;
+  overflow: auto;
+  padding: 16px;
+  white-space: pre-wrap;
+}
+
+.workflowList {
+  display: grid;
+  gap: 14px;
+}
+
+.workflowTopline {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.workflowTopline span {
+  background: #f6c85f;
+  border-radius: 999px;
+  color: #172026;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 5px 9px;
+}
+
+.workflowItem p {
+  margin: 10px 0;
+}
+
+.workflowItem ol {
+  margin: 0;
+  padding-left: 22px;
+}
+
+.workflowItem li {
+  margin-bottom: 8px;
+}
+
+.workflowItem li span,
+.workflowItem li small {
+  display: block;
+}
+
+@media (max-width: 860px) {
+  .appShell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    padding: 18px;
+  }
+
+  nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  main {
+    padding: 18px;
+  }
+
+  .topbar,
+  .sectionHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .metrics,
+  .twoColumn,
+  .split {
+    grid-template-columns: 1fr;
+  }
+}

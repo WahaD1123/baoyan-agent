@@ -19,13 +19,30 @@ Base URL: `http://127.0.0.1:8000`
 - `GET /api/knowledge/documents`
   - Lists knowledge base documents.
 - `POST /api/knowledge/documents`
-  - Adds a document.
+  - Adds a text document. Kept for backward compatibility.
   - Body: `title`, `doc_type`, `content`, `source`.
+- `POST /api/knowledge/documents/text`
+  - Adds a manually pasted document and records an ingest workflow.
+  - Body: `title`, `doc_type`, `source_type`, `content`, `source`.
+- `POST /api/knowledge/documents/upload`
+  - Uploads a PDF file and extracts text into the knowledge base.
+  - Form fields: `file`, `doc_type`, `title`.
+- `POST /api/knowledge/documents/url`
+  - Crawls a notice, advisor, or experience URL and stores structured content.
+  - Body: `url`, `doc_type`, optional `title`.
+- `GET /api/knowledge/documents/{id}`
+  - Returns one document with chunks and extracted fields.
 - `POST /api/knowledge/query`
-  - Runs RAG-style mock question answering.
+  - Runs hybrid retrieval plus RAG-style answering with cited chunks.
   - Body: `question`, `top_k`.
 - `GET /api/knowledge/advisors`
   - Lists advisor samples.
+- `POST /api/knowledge/advisors/url`
+  - Crawls one advisor homepage and saves both a document and an advisor card.
+  - Body: `url`, optional `title`.
+- `POST /api/knowledge/advisors/search`
+  - Searches the local advisor library by school, direction, and keywords.
+  - Body: `university`, `direction`, `keywords`, `limit`.
 - `POST /api/knowledge/advisors/match`
   - Matches advisors for a profile.
   - Body: `profile`, `top_k`.

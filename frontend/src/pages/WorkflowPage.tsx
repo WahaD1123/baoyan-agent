@@ -1,6 +1,6 @@
-import type { WorkflowRun } from "../types/domain";
 import { Section } from "../components/Section";
 import { WorkflowList } from "../components/WorkflowList";
+import type { WorkflowRun } from "../types/domain";
 
 type Props = {
   workflows: WorkflowRun[];
@@ -9,7 +9,12 @@ type Props = {
 
 export function WorkflowPage({ workflows, onRefresh }: Props) {
   return (
-    <Section title="Workflow 执行记录" eyebrow="Middleware" actions={<button onClick={onRefresh}>刷新记录</button>}>
+    <Section
+      title="执行记录"
+      eyebrow="过程留痕"
+      description="记录每次资料入库、问答、规划和导师匹配的关键步骤，方便展示系统不是只给结论。"
+      actions={<button onClick={onRefresh}>刷新记录</button>}
+    >
       <WorkflowList workflows={workflows} />
     </Section>
   );

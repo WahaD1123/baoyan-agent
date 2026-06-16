@@ -49,6 +49,30 @@ Open the app at `http://localhost:5173`. The frontend can show mock data even wh
 6. Generate mock interview questions.
 7. Review workflow records to explain the middleware design.
 
+## DashScope
+
+The project runs with Mock LLM by default. To use Alibaba Cloud DashScope locally, create `.env` in the repo root or `backend/`:
+
+```powershell
+LLM_PROVIDER=dashscope
+DASHSCOPE_API_KEY=your-new-local-key
+LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+LLM_MODEL=qwen-vl-max
+```
+
+Do not commit `.env` or paste real keys into code, docs, issues, or chat logs.
+
+## Member B Demo
+
+Member B owns the heterogeneous knowledge module:
+
+1. Add a notice by URL through `/api/knowledge/documents/url`.
+2. Upload a PDF through `/api/knowledge/documents/upload`.
+3. Paste an experience post through `/api/knowledge/documents/text`.
+4. Ask a RAG question through `/api/knowledge/query` and show cited chunks.
+5. Add an advisor homepage through `/api/knowledge/advisors/url`.
+6. Match advisors through `/api/knowledge/advisors/match`.
+
 ## Team Guide
 
 Read [docs/TEAM_GUIDE.md](docs/TEAM_GUIDE.md) before adding new modules. Read [docs/API.md](docs/API.md) before changing API contracts.

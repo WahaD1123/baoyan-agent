@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
@@ -25,17 +25,41 @@ class StudentProfile(BaseModel):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+DocumentType = Literal["notice", "experience", "advisor", "resume", "paper", "other"]
+SourceType = Literal["text", "pdf", "url", "sample"]
+
+
+class DocumentChunk(BaseModel):
+    id: str = Field(default_factory=lambda: new_id("chunk"))
+    document_id: str = ""
+    index: int = 0
+    text: str
+    keywords: list[str] = Field(default_factory=list)
+
+
 class DocumentCreate(BaseModel):
     title: str
-    doc_type: Literal["notice", "experience", "advisor", "resume", "paper", "other"] = "other"
+    doc_type: DocumentType = "other"
     content: str
     source: str = "manual"
+    source_type: SourceType = "text"
+    extracted: dict[str, Any] = Field(default_factory=dict)
 
 
 class Document(DocumentCreate):
     id: str = Field(default_factory=lambda: new_id("doc"))
     keywords: list[str] = Field(default_factory=list)
+    chunks: list[DocumentChunk] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class RetrievedChunk(BaseModel):
+    document_id: str
+    document_title: str
+    chunk_id: str
+    text: str
+    score: float
+    hit_reason: str
 
 
 class Advisor(BaseModel):
@@ -46,6 +70,9 @@ class Advisor(BaseModel):
     research_areas: list[str] = Field(default_factory=list)
     homepage: str = ""
     summary: str = ""
+    representative_works: list[str] = Field(default_factory=list)
+    suitable_background: str = ""
+    source_document_id: str = ""
 
 
 class AgentResult(BaseModel):
@@ -92,12 +119,53 @@ class KnowledgeQuery(BaseModel):
 class KnowledgeResponse(BaseModel):
     answer: str
     documents: list[Document]
+    chunks: list[RetrievedChunk] = Field(default_factory=list)
     workflow: WorkflowRun
 
 
 class AdvisorMatchRequest(BaseModel):
     profile: StudentProfile
     top_k: int = Field(default=3, ge=1, le=10)
+
+
+class AdvisorMatchResult(BaseModel):
+    advisor: Advisor
+    score: float
+    reasons: list[str] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
+    contact_suggestion: str = ""
+
+
+class AdvisorMatchResponse(BaseModel):
+    matches: list[AdvisorMatchResult]
+    workflow: WorkflowRun
+
+
+class UrlDocumentRequest(BaseModel):
+    url: str
+    doc_type: DocumentType = "notice"
+    title: str = ""
+
+
+class AdvisorUrlRequest(BaseModel):
+    url: str
+    title: str = ""
+
+
+class AdvisorSearchRequest(BaseModel):
+    university: str = ""
+    direction: str = ""
+    keywords: list[str] = Field(default_factory=list)
+    limit: int = Field(default=5, ge=1, le=10)
+
+
+class CrawlResult(BaseModel):
+    url: str
+    status: Literal["success", "failed"]
+    title: str = ""
+    content: str = ""
+    extracted: dict[str, Any] = Field(default_factory=dict)
+    error: str = ""
 
 
 class EmailGenerationRequest(BaseModel):

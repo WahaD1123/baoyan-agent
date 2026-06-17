@@ -208,6 +208,18 @@ class EmailGenerationRequest(BaseModel):
     purpose: str = "summer camp application"
 
 
+class ResumeHighlightRequest(BaseModel):
+    profile: StudentProfile
+    target_direction: str = "AI systems"
+
+
+class StatementRequest(BaseModel):
+    profile: StudentProfile
+    target_school: str = "Target University"
+    direction: str = "AI"
+    tone: str = "concise"
+
+
 class InterviewRequest(BaseModel):
     profile: StudentProfile
     target_school: str = "Target University"

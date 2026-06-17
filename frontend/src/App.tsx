@@ -46,8 +46,10 @@ function App() {
   const [timeline, setTimeline] = useState<string[]>([]);
   const [planningEvidence, setPlanningEvidence] = useState<string[]>([]);
   const [answer, setAnswer] = useState("上传或添加资料后，可以直接询问报名材料、截止时间和考核形式。");
-  const [email, setEmail] = useState("系统会根据你的画像和导师信息生成联系邮件初稿。");
-  const [interview, setInterview] = useState("系统会围绕你的项目经历和目标方向生成模拟面试题。");
+  const [email, setEmail] = useState("点击“生成导师邮件”后，这里会生成可继续修改的联系初稿。");
+  const [resumeHighlights, setResumeHighlights] = useState("点击“生成简历亮点”后，这里会把项目、竞赛和研究兴趣整理成可放进简历的表达。");
+  const [statement, setStatement] = useState("点击“生成个人陈述”后，这里会生成申请动机与研究兴趣片段。");
+  const [interview, setInterview] = useState("点击“生成面试题”后，这里会展示围绕个人项目和目标方向的模拟问题。");
   const [serviceReady, setServiceReady] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [analyzingProfile, setAnalyzingProfile] = useState(false);
@@ -160,6 +162,18 @@ function App() {
   async function generateEmail() {
     const result = await api.generateEmail(profile, advisors[0]);
     setEmail(result.content);
+    pushWorkflow(result.workflow);
+  }
+
+  async function generateResumeHighlights() {
+    const result = await api.generateResumeHighlights(profile);
+    setResumeHighlights(result.content);
+    pushWorkflow(result.workflow);
+  }
+
+  async function generateStatement() {
+    const result = await api.generateStatement(profile);
+    setStatement(result.content);
     pushWorkflow(result.workflow);
   }
 
@@ -287,8 +301,12 @@ function App() {
         {page === "materials" && (
           <MaterialsPage
             email={email}
+            resumeHighlights={resumeHighlights}
+            statement={statement}
             interview={interview}
             onEmail={generateEmail}
+            onResumeHighlights={generateResumeHighlights}
+            onStatement={generateStatement}
             onInterview={generateInterview}
           />
         )}

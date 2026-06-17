@@ -58,6 +58,12 @@ Base URL: `http://127.0.0.1:8000`
 - `POST /api/materials/email`
   - Generates an advisor contact email draft.
   - Body: `profile`, optional `advisor`, optional `purpose`.
+- `POST /api/materials/resume-highlights`
+  - Generates resume bullet highlights from projects, competitions, publications, and research interests.
+  - Body: `profile`, optional `target_direction`.
+- `POST /api/materials/statement`
+  - Generates a short personal statement segment with a critic review.
+  - Body: `profile`, optional `target_school`, optional `direction`, optional `tone`.
 
 ## Interview
 

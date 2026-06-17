@@ -168,32 +168,110 @@ def run_ingest_workflow(document: Document, source_label: str) -> WorkflowRun:
     )
 
 
-def run_material_workflow(profile: StudentProfile, advisor: Advisor | None, purpose: str) -> WorkflowRun:
-    advisor_text = f"{advisor.name} at {advisor.university}" if advisor else "target advisor"
-    draft = MaterialAgent().run(
-        f"Generate contact email for {profile.name} to {advisor_text}. Purpose: {purpose}"
+def _profile_brief(profile: StudentProfile) -> str:
+    return (
+        f"姓名: {profile.name}\n"
+        f"学校专业: {profile.university} / {profile.major}\n"
+        f"排名: Top {profile.rank_percent}%\n"
+        f"研究兴趣: {', '.join(profile.research_interests) or '未填写'}\n"
+        f"项目经历: {', '.join(profile.projects) or '未填写'}\n"
+        f"竞赛经历: {', '.join(profile.competitions) or '未填写'}\n"
+        f"论文经历: {', '.join(profile.publications) or '未填写'}\n"
+        f"补充说明: {profile.notes or '无'}"
     )
-    review = CriticAgent().run(draft.output, [draft.id])
+
+
+def _run_material_generation(
+    workflow_type: str,
+    title: str,
+    prompt: str,
+    references: list[str] | None = None,
+) -> WorkflowRun:
+    refs = references or []
+    draft = MaterialAgent().run(prompt, refs)
+    review = CriticAgent().run(
+        (
+            f"请审查以下保研申请材料是否具体、克制、有证据，指出空话和改写建议。\n"
+            f"材料类型: {title}\n"
+            f"材料内容:\n{draft.output}"
+        ),
+        [*refs, draft.id],
+    )
     return _workflow(
-        "material",
+        workflow_type,
         [
-            WorkflowStep(name="Generate application material", agent_result=draft),
-            WorkflowStep(name="Critic review", agent_result=review),
+            WorkflowStep(name=f"Generate {title}", agent_result=draft),
+            WorkflowStep(name=f"Critic review {title}", agent_result=review),
         ],
-        f"{draft.output}\n\nQuality check:\n{review.output}",
+        f"## {title}\n{draft.output}\n\n## 质量检查\n{review.output}",
     )
+
+
+def run_material_email_workflow(profile: StudentProfile, advisor: Advisor | None, purpose: str) -> WorkflowRun:
+    advisor_text = (
+        f"{advisor.name}，{advisor.university}{advisor.department}，方向: {', '.join(advisor.research_areas)}"
+        if advisor
+        else "目标导师，方向待补充"
+    )
+    prompt = (
+        "material_kind=advisor_email\n"
+        "请生成一封中文导师联系邮件，语气礼貌克制，包含称呼、自我介绍、研究匹配、附件说明和结尾。\n"
+        f"申请目的: {purpose}\n"
+        f"学生画像:\n{_profile_brief(profile)}\n"
+        f"导师信息: {advisor_text}"
+    )
+    refs = [f"{advisor.name} - {advisor.university}"] if advisor else []
+    return _run_material_generation("material_email", "导师联系邮件", prompt, refs)
+
+
+def run_resume_highlights_workflow(profile: StudentProfile, target_direction: str) -> WorkflowRun:
+    prompt = (
+        "material_kind=resume_highlights\n"
+        "请把学生经历改写成 4 条中文保研简历亮点。每条使用 动作-方法-结果-匹配方向 的结构，避免夸大。\n"
+        f"目标方向: {target_direction}\n"
+        f"学生画像:\n{_profile_brief(profile)}"
+    )
+    return _run_material_generation("resume_highlights", "简历亮点", prompt, profile.projects)
+
+
+def run_statement_workflow(profile: StudentProfile, target_school: str, direction: str, tone: str) -> WorkflowRun:
+    prompt = (
+        "material_kind=personal_statement\n"
+        "请生成一段中文个人陈述片段，包含研究兴趣来源、项目经历支撑、目标方向匹配和后续计划。\n"
+        f"目标学校: {target_school}\n"
+        f"申请方向: {direction}\n"
+        f"语气要求: {tone}\n"
+        f"学生画像:\n{_profile_brief(profile)}"
+    )
+    return _run_material_generation("personal_statement", "个人陈述", prompt, [target_school, direction])
+
+
+def run_material_workflow(profile: StudentProfile, advisor: Advisor | None, purpose: str) -> WorkflowRun:
+    return run_material_email_workflow(profile, advisor, purpose)
 
 
 def run_interview_workflow(profile: StudentProfile, target_school: str, direction: str) -> WorkflowRun:
     interview = InterviewAgent().run(
-        f"Generate mock interview questions for {profile.name}, target: {target_school}, direction: {direction}"
+        (
+            "interview_kind=categorized_mock\n"
+            "请生成中文 CS 保研模拟面试题，按 项目追问、专业基础、科研方向、英文面试、复盘建议 分类。\n"
+            f"目标学校: {target_school}\n"
+            f"申请方向: {direction}\n"
+            f"学生画像:\n{_profile_brief(profile)}"
+        )
     )
-    review = CriticAgent().run(interview.output, [interview.id])
+    review = CriticAgent().run(
+        (
+            "请审查以下模拟面试题是否覆盖项目、基础、科研和英文表达，并指出还缺少哪些追问。\n"
+            f"面试题内容:\n{interview.output}"
+        ),
+        [interview.id, target_school, direction],
+    )
     return _workflow(
         "interview",
         [
-            WorkflowStep(name="Generate mock interview", agent_result=interview),
-            WorkflowStep(name="Critic review", agent_result=review),
+            WorkflowStep(name="Generate categorized mock interview", agent_result=interview),
+            WorkflowStep(name="Critic review interview", agent_result=review),
         ],
-        f"{interview.output}\n\nQuality check:\n{review.output}",
+        f"## 模拟面试题\n{interview.output}\n\n## 质量检查\n{review.output}",
     )

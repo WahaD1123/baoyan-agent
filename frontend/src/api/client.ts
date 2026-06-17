@@ -172,6 +172,42 @@ export const api = {
       { method: "POST", headers: jsonHeaders, body: JSON.stringify({ profile, advisor }) },
       { content: "老师您好，我是示例同学，想向您简要介绍我的研究背景与申请意向。", workflow: sampleWorkflow }
     ),
+  generateResumeHighlights: (profile: StudentProfile) =>
+    request<{ content: string; workflow: WorkflowRun }>(
+      "/api/materials/resume-highlights",
+      {
+        method: "POST",
+        headers: jsonHeaders,
+        body: JSON.stringify({
+          profile,
+          target_direction: profile.research_interests.join(" / ") || "AI systems"
+        })
+      },
+      {
+        content:
+          "## 简历亮点\n1. 围绕多智能体保研助手完成任务拆解、接口联调和 workflow 展示。\n2. 将课程推荐系统经历整理为用户画像与推荐逻辑实践。\n\n## 质量检查\n建议补充项目规模、技术栈和可量化结果。",
+        workflow: sampleWorkflow
+      }
+    ),
+  generateStatement: (profile: StudentProfile) =>
+    request<{ content: string; workflow: WorkflowRun }>(
+      "/api/materials/statement",
+      {
+        method: "POST",
+        headers: jsonHeaders,
+        body: JSON.stringify({
+          profile,
+          target_school: profile.preferred_schools[0] || "目标院校",
+          direction: profile.research_interests[0] || "AI",
+          tone: "concise"
+        })
+      },
+      {
+        content:
+          "## 个人陈述\n我希望围绕智能系统方向继续学习，把项目实践中的工程能力和研究问题结合起来。\n\n## 质量检查\n建议加入更具体的项目证据和目标导师方向。",
+        workflow: sampleWorkflow
+      }
+    ),
   generateInterview: (profile: StudentProfile) =>
     request<{ content: string; workflow: WorkflowRun }>(
       "/api/interview/mock",

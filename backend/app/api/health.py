@@ -18,4 +18,6 @@ def llm_health() -> dict[str, str | bool]:
         "model": settings.llm_model,
         "base_url": settings.llm_base_url or "https://dashscope.aliyuncs.com/compatible-mode/v1",
         "has_api_key": bool(settings.llm_api_key),
+        "loaded_env_files": ", ".join(settings.loaded_env_files) if settings.loaded_env_files else "none",
+        "expected_env_files": ", ".join(settings.expected_env_files),
     }

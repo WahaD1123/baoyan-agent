@@ -1,53 +1,57 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "./api/client";
-import { sampleAdvisors, sampleDocuments, sampleProfile, sampleWorkflow } from "./api/mockData";
+import { sampleAdvisors, sampleDocuments, sampleProfile } from "./api/mockData";
 import { KnowledgePage } from "./pages/KnowledgePage";
 import { MaterialsPage } from "./pages/MaterialsPage";
 import { PlanningPage } from "./pages/PlanningPage";
 import { ProfilePage } from "./pages/ProfilePage";
-import { WorkflowPage } from "./pages/WorkflowPage";
 import type {
   Advisor,
   AdvisorMatchResult,
   DocumentItem,
+  ProfileAnalysis,
   RetrievedChunk,
+  SchoolRecommendation,
   StudentProfile,
-  WorkflowRun
+  WorkflowRun,
 } from "./types/domain";
 
-type PageKey = "profile" | "knowledge" | "planning" | "materials" | "workflows";
+type PageKey = "profile" | "planning" | "knowledge" | "materials";
 
 const navItems: { key: PageKey; label: string }[] = [
-  { key: "profile", label: "我的画像" },
-  { key: "knowledge", label: "资料库" },
+  { key: "profile", label: "个人背景" },
   { key: "planning", label: "院校规划" },
-  { key: "materials", label: "材料面试" },
-  { key: "workflows", label: "执行记录" }
+  { key: "knowledge", label: "资料问答" },
+  { key: "materials", label: "材料与面试" },
 ];
 
 const pageDescriptions: Record<PageKey, string> = {
-  profile: "先确认个人背景，再让后续推荐更贴近你的申请目标。",
-  knowledge: "把院校通知、导师主页、经验贴和 PDF 统一整理成可查询资料。",
-  planning: "根据画像和资料，生成冲稳保策略与准备节奏。",
-  materials: "围绕导师联系、申请邮件和模拟面试快速生成初稿。",
-  workflows: "查看每一次生成背后的步骤，方便课程展示和小组协作。"
+  profile: "先填写你的背景信息，系统会分析优势、短板和下一步准备重点。",
+  planning: "根据你的画像生成冲刺、稳妥、保底院校建议和准备节奏。",
+  knowledge: "上传院校通知、导师主页和经验贴，快速查询材料要求和方向信息。",
+  materials: "生成联系邮件和模拟面试题，帮助你更快进入准备状态。",
 };
 
 function App() {
-  const [page, setPage] = useState<PageKey>("knowledge");
+  const [page, setPage] = useState<PageKey>("profile");
   const [profile, setProfile] = useState<StudentProfile>(sampleProfile);
+  const [analysis, setAnalysis] = useState<ProfileAnalysis | null>(null);
   const [documents, setDocuments] = useState<DocumentItem[]>(sampleDocuments);
   const [advisors, setAdvisors] = useState<Advisor[]>(sampleAdvisors);
-  const [workflows, setWorkflows] = useState<WorkflowRun[]>([sampleWorkflow]);
+  const [workflows, setWorkflows] = useState<WorkflowRun[]>([]);
   const [chunks, setChunks] = useState<RetrievedChunk[]>([]);
   const [matches, setMatches] = useState<AdvisorMatchResult[]>([]);
-  const [plan, setPlan] = useState("点击“生成规划”后，这里会展示院校梯度、时间安排和准备建议。");
-  const [schools, setSchools] = useState<string[]>([]);
+  const [plan, setPlan] = useState("填写背景后，一键生成适合你的申请规划。");
+  const [recommendations, setRecommendations] = useState<SchoolRecommendation[]>([]);
   const [timeline, setTimeline] = useState<string[]>([]);
-  const [answer, setAnswer] = useState("上传或抓取资料后，可以直接询问报名材料、截止时间、考核形式等问题。");
-  const [email, setEmail] = useState("点击“生成导师邮件”后，这里会生成可继续修改的联系初稿。");
-  const [interview, setInterview] = useState("点击“生成面试题”后，这里会展示围绕个人项目和目标方向的模拟问题。");
+  const [planningEvidence, setPlanningEvidence] = useState<string[]>([]);
+  const [answer, setAnswer] = useState("上传或添加资料后，可以直接询问报名材料、截止时间和考核形式。");
+  const [email, setEmail] = useState("系统会根据你的画像和导师信息生成联系邮件初稿。");
+  const [interview, setInterview] = useState("系统会围绕你的项目经历和目标方向生成模拟面试题。");
   const [serviceReady, setServiceReady] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [analyzingProfile, setAnalyzingProfile] = useState(false);
+  const [planning, setPlanning] = useState(false);
 
   useEffect(() => {
     Promise.all([api.getProfile(), api.getDocuments(), api.getAdvisors(), api.getWorkflows(), api.getLlmHealth()]).then(
@@ -62,24 +66,49 @@ function App() {
   }, []);
 
   const currentTitle = useMemo(
-    () => navItems.find((item) => item.key === page)?.label ?? "保研申请助理",
+    () => navItems.find((item) => item.key === page)?.label ?? "保研申请助手",
     [page]
   );
 
-  async function refreshWorkflows() {
-    setWorkflows(await api.getWorkflows());
+  function pushWorkflow(workflow: WorkflowRun) {
+    setWorkflows((items) => [workflow, ...items.filter((item) => item.id !== workflow.id)]);
+  }
+
+  async function saveProfile(nextProfile: StudentProfile) {
+    setSavingProfile(true);
+    try {
+      const saved = await api.saveProfile(nextProfile);
+      setProfile(saved);
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
+  async function analyzeProfile(nextProfile: StudentProfile) {
+    setAnalyzingProfile(true);
+    try {
+      const result = await api.analyzeProfile(nextProfile);
+      setAnalysis(result);
+      setProfile(nextProfile);
+      setPage("planning");
+    } finally {
+      setAnalyzingProfile(false);
+    }
   }
 
   async function generatePlan() {
-    const result = await api.generatePlan(profile);
-    setPlan(result.plan);
-    setSchools(result.schools);
-    setTimeline(result.timeline);
-    pushWorkflow(result.workflow);
-  }
-
-  function pushWorkflow(workflow: WorkflowRun) {
-    setWorkflows((items) => [workflow, ...items.filter((item) => item.id !== workflow.id)]);
+    setPlanning(true);
+    try {
+      const result = await api.generatePlan(profile);
+      setPlan(result.plan);
+      setAnalysis(result.analysis);
+      setRecommendations(result.recommendations);
+      setTimeline(result.timeline);
+      setPlanningEvidence(result.evidence);
+      pushWorkflow(result.workflow);
+    } finally {
+      setPlanning(false);
+    }
   }
 
   async function addTextDocument(payload: { title: string; doc_type: string; content: string; source: string }) {
@@ -124,7 +153,7 @@ function App() {
     const result = await api.matchAdvisors(profile);
     setMatches(result.matches);
     setAdvisors(result.matches.map((match) => match.advisor));
-    setAnswer(result.workflow.final_result);
+    setAnswer("已根据你的研究兴趣和项目背景生成导师匹配建议。");
     pushWorkflow(result.workflow);
   }
 
@@ -144,9 +173,9 @@ function App() {
     <div className="siteShell">
       <header className="heroStage">
         <nav className="siteNav">
-          <button className="wordmark" onClick={() => setPage("knowledge")}>
+          <button className="wordmark" onClick={() => setPage("profile")}>
             <span>保</span>
-            <strong>保研申请助理</strong>
+            <strong>保研申请助手</strong>
           </button>
           <div className="navLinks">
             {navItems.map((item) => (
@@ -159,40 +188,44 @@ function App() {
               </button>
             ))}
           </div>
-          <button className="navCta" onClick={() => setPage("knowledge")}>开始整理</button>
+          <button className="navCta" onClick={() => setPage("profile")}>
+            开始填写
+          </button>
         </nav>
 
         <div className="heroGrid">
           <div className="heroCopy">
             <p className="heroKicker">CS 保研申请工作台</p>
             <h1>
-              从资料到联系，
-              <span>一次理清。</span>
+              先看清自己
+              <span>再决定投哪里</span>
             </h1>
             <p>
-              整理院校通知、导师主页和经验贴，生成有引用的问答、导师匹配建议与申请准备清单。
+              这套系统会先分析你的背景，再生成冲刺、稳妥、保底院校建议，并补上后续材料和面试准备节奏。
             </p>
             <div className="heroActions">
-              <button onClick={() => setPage("knowledge")}>进入资料库</button>
-              <button className="ghostButton" onClick={() => setPage("planning")}>生成申请规划</button>
+              <button onClick={() => setPage("profile")}>填写背景</button>
+              <button className="ghostButton" onClick={() => setPage("planning")}>
+                查看规划
+              </button>
             </div>
           </div>
 
           <div className="heroVisual" aria-hidden="true">
             <div className="visualPanel mainPanel">
-              <span>今日重点</span>
-              <strong>补齐夏令营材料清单</strong>
-              <p>已整理截止时间、报名入口、考核形式和推荐准备动作。</p>
+              <span>第一步</span>
+              <strong>完成背景画像</strong>
+              <p>把排名、绩点、项目、竞赛和目标方向整理清楚，后续推荐才会真正有针对性。</p>
             </div>
             <div className="visualPanel advisorPanel">
-              <span>导师候选</span>
-              <strong>6 位可优先联系</strong>
-              <p>按研究方向、项目经历和学校偏好排序。</p>
+              <span>第二步</span>
+              <strong>生成院校梯度</strong>
+              <p>系统会把推荐结果分成冲刺、稳妥、保底三档，并提示风险和准备重点。</p>
             </div>
             <div className="visualPanel notePanel">
-              <span>引用依据</span>
-              <strong>12 条资料片段</strong>
-              <p>每个回答都能回到原始通知或主页。</p>
+              <span>第三步</span>
+              <strong>进入材料准备</strong>
+              <p>完成规划后，再继续联系导师、生成邮件和做模拟面试，学习成本会更低。</p>
             </div>
             <div className="visualLine lineOne" />
             <div className="visualLine lineTwo" />
@@ -207,10 +240,34 @@ function App() {
             <h2>{currentTitle}</h2>
             <p>{pageDescriptions[page]}</p>
           </div>
-          <div className="statusPill">{serviceReady ? "智能服务已连接" : "演示模式"}</div>
+          <div className="statusPill">{serviceReady ? "服务可用" : "演示模式"}</div>
         </div>
 
-        {page === "profile" && <ProfilePage profile={profile} />}
+        {page === "profile" && (
+          <ProfilePage
+            analysis={analysis}
+            onAnalyze={analyzeProfile}
+            onProfileChange={setProfile}
+            onSave={saveProfile}
+            onStartPlanning={generatePlan}
+            profile={profile}
+            saving={savingProfile}
+            analyzing={analyzingProfile}
+            planning={planning}
+          />
+        )}
+        {page === "planning" && (
+          <PlanningPage
+            profile={profile}
+            analysis={analysis}
+            plan={plan}
+            recommendations={recommendations}
+            timeline={timeline}
+            evidence={planningEvidence}
+            onGenerate={generatePlan}
+            loading={planning}
+          />
+        )}
         {page === "knowledge" && (
           <KnowledgePage
             documents={documents}
@@ -227,15 +284,6 @@ function App() {
             onMatch={matchAdvisors}
           />
         )}
-        {page === "planning" && (
-          <PlanningPage
-            profile={profile}
-            plan={plan}
-            schools={schools}
-            timeline={timeline}
-            onGenerate={generatePlan}
-          />
-        )}
         {page === "materials" && (
           <MaterialsPage
             email={email}
@@ -244,7 +292,6 @@ function App() {
             onInterview={generateInterview}
           />
         )}
-        {page === "workflows" && <WorkflowPage workflows={workflows} onRefresh={refreshWorkflows} />}
       </main>
     </div>
   );

@@ -15,6 +15,10 @@ class StudentProfile(BaseModel):
     university: str = "Xiamen University"
     major: str = "Computer Science"
     rank_percent: float = Field(default=10, ge=0, le=100)
+    gpa: float = Field(default=3.7, ge=0, le=4.5)
+    english_score: str = "CET-6 500"
+    target_degree: str = "master"
+    risk_preference: Literal["conservative", "balanced", "aggressive"] = "balanced"
     research_interests: list[str] = Field(default_factory=lambda: ["AI", "systems"])
     projects: list[str] = Field(default_factory=list)
     competitions: list[str] = Field(default_factory=list)
@@ -104,10 +108,40 @@ class PlanRequest(BaseModel):
     target: str = "CS baoyan application"
 
 
+class ProfileAnalysis(BaseModel):
+    overall_score: int
+    academic_score: int
+    research_score: int
+    project_score: int
+    competition_score: int
+    language_score: int
+    strengths: list[str] = Field(default_factory=list)
+    weaknesses: list[str] = Field(default_factory=list)
+    suggestions: list[str] = Field(default_factory=list)
+    summary: str = ""
+
+
+class SchoolRecommendation(BaseModel):
+    school_name: str
+    program_name: str
+    level: Literal["challenge", "stable", "safe"]
+    match_score: int = Field(ge=0, le=100)
+    reasons: list[str] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
+    todo: list[str] = Field(default_factory=list)
+    evidence: list[str] = Field(default_factory=list)
+    materials: list[str] = Field(default_factory=list)
+    exam_format: list[str] = Field(default_factory=list)
+    deadline: str = ""
+    agent_insight: str = ""
+
+
 class PlanResponse(BaseModel):
     plan: str
-    schools: list[str]
+    analysis: ProfileAnalysis
+    recommendations: list[SchoolRecommendation]
     timeline: list[str]
+    evidence: list[str] = Field(default_factory=list)
     workflow: WorkflowRun
 
 

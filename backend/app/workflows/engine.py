@@ -10,6 +10,14 @@ from app.agents import (
 )
 from app.models import Advisor, AdvisorMatchResult, Document, RetrievedChunk, StudentProfile, WorkflowRun, WorkflowStep
 from app.services.llm import get_llm_provider
+from app.services.planning_service import (
+    analyze_profile,
+    build_timeline,
+    format_plan_summary,
+    recommend_schools,
+    retrieve_planning_evidence,
+)
+from app.services.store import store
 
 
 def _workflow(workflow_type: str, steps: list[WorkflowStep], final_result: str) -> WorkflowRun:
@@ -17,10 +25,26 @@ def _workflow(workflow_type: str, steps: list[WorkflowStep], final_result: str) 
 
 
 def run_planning_workflow(profile: StudentProfile) -> WorkflowRun:
-    profile_text = f"{profile.name}, rank top {profile.rank_percent}%, interests: {', '.join(profile.research_interests)}"
+    analysis = analyze_profile(profile)
+    evidence_chunks = retrieve_planning_evidence(profile, store.documents)
+    recommendations = recommend_schools(profile, analysis, store.documents, evidence_chunks)
+    timeline = build_timeline(profile, recommendations)
+    evidence_titles = list(dict.fromkeys(chunk.document_title for chunk in evidence_chunks))
+    profile_text = (
+        f"{profile.name}, rank top {profile.rank_percent}%, GPA {profile.gpa}, "
+        f"interests: {', '.join(profile.research_interests)}"
+    )
     profile_result = ProfileAgent().run(profile_text)
-    school_result = SchoolRecommendAgent().run(profile_result.output)
-    planner_result = PlannerAgent().run(school_result.output)
+    school_prompt = (
+        f"{profile_result.output}\n"
+        f"Structured analysis: overall={analysis.overall_score}, "
+        f"strengths={'; '.join(analysis.strengths)}, weaknesses={'; '.join(analysis.weaknesses)}\n"
+        f"Retrieved evidence titles: {', '.join(evidence_titles) or 'none'}"
+    )
+    school_result = SchoolRecommendAgent().run(school_prompt)
+    planner_prompt = format_plan_summary(profile, analysis, recommendations, timeline, evidence_titles)
+    planner_result = PlannerAgent().run(planner_prompt)
+    planner_result.output = planner_prompt
     return _workflow(
         "planning",
         [

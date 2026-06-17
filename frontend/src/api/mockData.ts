@@ -1,4 +1,11 @@
-import type { Advisor, DocumentItem, StudentProfile, WorkflowRun } from "../types/domain";
+import type {
+  Advisor,
+  DocumentItem,
+  ProfileAnalysis,
+  SchoolRecommendation,
+  StudentProfile,
+  WorkflowRun,
+} from "../types/domain";
 
 export const sampleProfile: StudentProfile = {
   id: "profile_demo",
@@ -6,6 +13,10 @@ export const sampleProfile: StudentProfile = {
   university: "厦门大学",
   major: "计算机科学与技术",
   rank_percent: 8,
+  gpa: 3.82,
+  english_score: "CET-6 523",
+  target_degree: "master",
+  risk_preference: "balanced",
   research_interests: ["机器学习", "智能系统"],
   projects: ["多智能体保研助手", "课程推荐系统"],
   competitions: ["蓝桥杯省级奖项"],
@@ -13,8 +24,66 @@ export const sampleProfile: StudentProfile = {
   target_regions: ["上海", "北京"],
   preferred_schools: ["上海交通大学", "浙江大学"],
   notes: "希望申请人工智能系统与检索问答方向。",
-  updated_at: new Date().toISOString()
+  updated_at: new Date().toISOString(),
 };
+
+export const sampleProfileAnalysis: ProfileAnalysis = {
+  overall_score: 81,
+  academic_score: 86,
+  research_score: 72,
+  project_score: 82,
+  competition_score: 70,
+  language_score: 82,
+  strengths: ["排名较强，适合冲击头部院校。", "项目方向与 AI 方向匹配度较高。"],
+  weaknesses: ["科研成果偏少，强校竞争时证据略弱。"],
+  suggestions: ["把项目结果量化成可展示指标。", "提前准备机考和项目追问。"],
+  summary: "当前背景适合采用冲刺、稳妥、保底组合申请策略。",
+};
+
+export const sampleRecommendations: SchoolRecommendation[] = [
+  {
+    school_name: "Shanghai Jiao Tong University",
+    program_name: "CS Summer Camp",
+    level: "challenge",
+    match_score: 84,
+    reasons: ["排名基础强。", "AI 方向项目与目标实验室契合。"],
+    risks: ["机考和项目追问压力较大。"],
+    todo: ["优先准备项目亮点表达。", "提前联系目标导师。"],
+    evidence: ["上海交通大学计算机夏令营通知"],
+    materials: ["个人简历", "成绩单", "排名证明"],
+    exam_format: ["机考", "专业面试"],
+    deadline: "6 月中旬",
+    agent_insight: "这所学校适合作为冲刺目标，建议先准备机考和项目追问，再同步核对材料细节。",
+  },
+  {
+    school_name: "Zhejiang University",
+    program_name: "Computer Science Program",
+    level: "stable",
+    match_score: 79,
+    reasons: ["院校方向匹配度较高。", "稳妥梯度合理。"],
+    risks: ["需要把科研动机表达得更完整。"],
+    todo: ["完善个人陈述。", "补足材料细节。"],
+    evidence: [],
+    materials: [],
+    exam_format: [],
+    deadline: "",
+    agent_insight: "这所学校更适合稳妥推进，重点是把研究兴趣和项目动机讲清楚。",
+  },
+  {
+    school_name: "Xiamen University",
+    program_name: "AI Lab Track",
+    level: "safe",
+    match_score: 74,
+    reasons: ["背景基本匹配。", "保底层次清晰。"],
+    risks: ["需确认具体实验室方向。"],
+    todo: ["尽早提交基础材料。"],
+    evidence: [],
+    materials: [],
+    exam_format: [],
+    deadline: "",
+    agent_insight: "这所学校可以作为保底布局，建议尽早完成基础材料并核对实验室方向。",
+  },
+];
 
 export const sampleDocuments: DocumentItem[] = [
   {
@@ -27,7 +96,7 @@ export const sampleDocuments: DocumentItem[] = [
     keywords: ["上海交通大学", "个人简历", "机考"],
     chunks: [],
     extracted: { materials: ["个人简历", "成绩单", "排名证明"], exam_format: ["机考", "专业面试"] },
-    created_at: new Date().toISOString()
+    created_at: new Date().toISOString(),
   },
   {
     id: "doc_advisor",
@@ -39,8 +108,8 @@ export const sampleDocuments: DocumentItem[] = [
     keywords: ["大模型应用", "智能系统", "机器学习"],
     chunks: [],
     extracted: { name: "王老师", research_areas: ["大模型应用", "机器学习系统"] },
-    created_at: new Date().toISOString()
-  }
+    created_at: new Date().toISOString(),
+  },
 ];
 
 export const sampleAdvisors: Advisor[] = [
@@ -54,7 +123,7 @@ export const sampleAdvisors: Advisor[] = [
     summary: "关注智能系统和应用机器学习，适合有工程项目经验的学生。",
     representative_works: ["面向可信应用的智能系统研究"],
     suitable_background: "有机器学习项目、系统开发或科研训练经历的学生。",
-    source_document_id: "doc_advisor"
+    source_document_id: "doc_advisor",
   },
   {
     id: "advisor_chen",
@@ -66,40 +135,40 @@ export const sampleAdvisors: Advisor[] = [
     summary: "关注检索系统与数据管理，适合对搜索、问答和数据库感兴趣的学生。",
     representative_works: ["面向问答场景的数据管理研究"],
     suitable_background: "适合有数据库、搜索系统或问答项目经历的学生。",
-    source_document_id: ""
-  }
+    source_document_id: "",
+  },
 ];
 
 export const sampleWorkflow: WorkflowRun = {
   id: "workflow_demo",
-  workflow_type: "申请规划",
+  workflow_type: "planning",
   status: "completed",
   created_at: new Date().toISOString(),
-  final_result: "已生成院校梯度、材料准备节奏和导师联系建议。",
+  final_result: "已生成院校梯度、准备节奏和导师联系建议。",
   steps: [
     {
       name: "分析学生画像",
       status: "completed",
       agent_result: {
         id: "agent_profile",
-        agent_name: "画像分析",
+        agent_name: "ProfileAgent",
         input_summary: "专业排名前 8%，方向为机器学习和智能系统。",
         output: "背景适合申请人工智能系统相关项目。",
         references: [],
-        created_at: new Date().toISOString()
-      }
+        created_at: new Date().toISOString(),
+      },
     },
     {
       name: "生成申请节奏",
       status: "completed",
       agent_result: {
         id: "agent_planner",
-        agent_name: "申请规划",
+        agent_name: "PlannerAgent",
         input_summary: "结合推荐院校与截止时间。",
-        output: "先准备材料，再联系导师，最后进行面试练习。",
+        output: "先准备材料，再联系导师，最后集中进行面试练习。",
         references: ["上海交通大学计算机夏令营通知"],
-        created_at: new Date().toISOString()
-      }
-    }
-  ]
+        created_at: new Date().toISOString(),
+      },
+    },
+  ],
 };

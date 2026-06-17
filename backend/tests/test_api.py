@@ -18,7 +18,21 @@ def test_mock_planning_workflow() -> None:
     assert response.status_code == 200
     data = response.json()
     assert data["workflow"]["workflow_type"] == "planning"
-    assert data["schools"]
+    assert data["recommendations"]
+    assert data["analysis"]["overall_score"] >= 0
+    assert data["timeline"]
+    assert data["evidence"] is not None
+    school_names = [item["school_name"] for item in data["recommendations"]]
+    assert len(school_names) == len(set(school_names))
+
+
+def test_profile_analysis() -> None:
+    profile = client.get("/api/profile").json()
+    response = client.post("/api/profile/analyze", json=profile)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["overall_score"] >= 0
+    assert "strengths" in data
 
 
 def test_member_b_text_ingest_query_and_match() -> None:

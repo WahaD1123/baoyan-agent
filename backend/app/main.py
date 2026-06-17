@@ -1,11 +1,15 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import logging
 
 from app.api import health, interview, knowledge, materials, planning, profile, workflows
 from app.core.config import get_settings
 
 
 settings = get_settings()
+logger = logging.getLogger("baoyan-agent")
+if not logger.handlers:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s - %(message)s")
 
 app = FastAPI(
     title=settings.app_name,
@@ -28,3 +32,14 @@ app.include_router(planning.router, prefix="/api/planning", tags=["planning"])
 app.include_router(materials.router, prefix="/api/materials", tags=["materials"])
 app.include_router(interview.router, prefix="/api/interview", tags=["interview"])
 app.include_router(workflows.router, prefix="/api/workflows", tags=["workflows"])
+
+
+@app.on_event("startup")
+def log_startup_settings() -> None:
+    logger.info(
+        "App startup: provider=%s model=%s has_api_key=%s loaded_env_files=%s",
+        settings.llm_provider,
+        settings.llm_model,
+        bool(settings.llm_api_key),
+        settings.loaded_env_files or ["none"],
+    )

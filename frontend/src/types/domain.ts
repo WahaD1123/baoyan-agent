@@ -4,6 +4,10 @@ export type StudentProfile = {
   university: string;
   major: string;
   rank_percent: number;
+  gpa: number;
+  english_score: string;
+  target_degree: string;
+  risk_preference: "conservative" | "balanced" | "aggressive";
   research_interests: string[];
   projects: string[];
   competitions: string[];
@@ -87,4 +91,32 @@ export type WorkflowRun = {
   steps: WorkflowStep[];
   final_result: string;
   created_at: string;
+};
+
+export type ProfileAnalysis = {
+  overall_score: number;
+  academic_score: number;
+  research_score: number;
+  project_score: number;
+  competition_score: number;
+  language_score: number;
+  strengths: string[];
+  weaknesses: string[];
+  suggestions: string[];
+  summary: string;
+};
+
+export type SchoolRecommendation = {
+  school_name: string;
+  program_name: string;
+  level: "challenge" | "stable" | "safe";
+  match_score: number;
+  reasons: string[];
+  risks: string[];
+  todo: string[];
+  evidence: string[];
+  materials: string[];
+  exam_format: string[];
+  deadline: string;
+  agent_insight: string;
 };

@@ -237,6 +237,16 @@ textarea {
   color: #ffffff;
 }
 
+.darkGhost {
+  background: #f4f2e8;
+  border: 1px solid #d9d4c6;
+  color: #191b17;
+}
+
+.darkGhost:hover {
+  background: #ece8da;
+}
+
 .heroVisual {
   min-height: 430px;
   position: relative;
@@ -853,6 +863,101 @@ summary {
   display: block;
 }
 
+.profileLayout,
+.planningHero,
+.recommendationGrid {
+  display: grid;
+  gap: 16px;
+}
+
+.profileLayout {
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.9fr);
+}
+
+.profileForm,
+.profileSummary {
+  display: grid;
+  gap: 14px;
+}
+
+.summaryText {
+  color: #44483f;
+  line-height: 1.7;
+  margin: 0 0 12px;
+}
+
+.scoreStrip {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 14px;
+}
+
+.scoreStrip div,
+.scoreBar {
+  background: #f7f6ef;
+  border: 1px solid #e1ded3;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.scoreStrip span,
+.scoreBar span {
+  color: #74786e;
+  display: block;
+  font-size: 12px;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.scoreStrip strong,
+.scoreBar strong {
+  font-size: 24px;
+}
+
+.insetPanel {
+  background: #faf8f0;
+}
+
+.planningHero {
+  grid-template-columns: minmax(0, 1.15fr) minmax(300px, 0.85fr);
+  margin-bottom: 16px;
+}
+
+.recommendationGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 16px;
+}
+
+.recommendationCard {
+  background: #ffffff;
+  border: 1px solid #e1ded3;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.recommendationSection {
+  margin-top: 14px;
+}
+
+.recommendationSection h4 {
+  margin: 0 0 8px;
+}
+
+.timelinePanel h3 {
+  margin-top: 0;
+}
+
+.timelineList {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.timelineList li {
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+
 @media (max-width: 980px) {
   .siteNav,
   .heroGrid,
@@ -863,7 +968,11 @@ summary {
   .compactForms,
   .primaryGrid,
   .compactSearch,
-  .knowledgeLayout {
+  .knowledgeLayout,
+  .profileLayout,
+  .planningHero,
+  .recommendationGrid,
+  .scoreStrip {
     grid-template-columns: 1fr;
   }
 

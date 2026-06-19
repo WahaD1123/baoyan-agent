@@ -23,6 +23,10 @@ class Settings:
         self.llm_api_key = os.getenv("LLM_API_KEY", "") or os.getenv("DASHSCOPE_API_KEY", "")
         self.llm_base_url = os.getenv("LLM_BASE_URL", "")
         self.llm_model = os.getenv("LLM_MODEL", "qwen-vl-max")
+        self.llm_critic_model = os.getenv("LLM_CRITIC_MODEL", "qwen3.6-flash")
+        self.llm_critic_max_tokens = _env_int("LLM_CRITIC_MAX_TOKENS", 400)
+        self.llm_member_c_fallback_model = os.getenv("LLM_MEMBER_C_FALLBACK_MODEL", "qwen3.6-flash")
+        self.llm_member_c_max_tokens = _env_int("LLM_MEMBER_C_MAX_TOKENS", 800)
         self.loaded_env_files = list(dict.fromkeys(_loaded_env_files))
         self.expected_env_files = [str(root_env), str(backend_env)]
 
@@ -49,3 +53,10 @@ def _load_env_file(path: Path) -> None:
         value = value.strip().strip('"').strip("'")
         if key:
             os.environ[key] = value
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except ValueError:
+        return default

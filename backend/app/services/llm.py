@@ -129,6 +129,10 @@ class DashScopeProvider:
         self.api_key = settings.llm_api_key
         self.base_url = (settings.llm_base_url or "https://dashscope.aliyuncs.com/compatible-mode/v1").strip()
         self.model = settings.llm_model or "qwen-plus"
+        self.critic_model = settings.llm_critic_model
+        self.critic_max_tokens = settings.llm_critic_max_tokens
+        self.member_c_fallback_model = settings.llm_member_c_fallback_model
+        self.member_c_max_tokens = settings.llm_member_c_max_tokens
         self.fallback = MockLLMProvider()
 
     def generate(self, prompt: str, task: str = "general") -> str:
@@ -146,33 +150,71 @@ class DashScopeProvider:
             "material": "你是CS保研申请材料助手。请生成具体、克制、有证据的中文申请材料，避免空泛夸大。",
             "interview": "你是CS保研模拟面试官。请按项目、专业基础、科研方向和英文面试分类出题。",
         }
+        primary_model = self.critic_model if task == "critic" else self.model
+        max_tokens = self.critic_max_tokens if task == "critic" else None
+        if task in {"material", "interview"}:
+            max_tokens = self.member_c_max_tokens
+        try:
+            return self._request(prompt, task, system_prompts, primary_model, max_tokens)
+        except (httpx.HTTPError, KeyError, IndexError, json.JSONDecodeError) as exc:
+            can_fallback_to_flash = (
+                task in {"material", "interview"}
+                and self.member_c_fallback_model != primary_model
+                and isinstance(exc, (httpx.ReadTimeout, httpx.ConnectTimeout))
+            )
+            if can_fallback_to_flash:
+                logger.warning(
+                    "DashScope retry for task=%s: model=%s timed out, falling back to model=%s",
+                    task,
+                    primary_model,
+                    self.member_c_fallback_model,
+                )
+                try:
+                    return self._request(
+                        prompt,
+                        task,
+                        system_prompts,
+                        self.member_c_fallback_model,
+                        max_tokens,
+                    )
+                except (httpx.HTTPError, KeyError, IndexError, json.JSONDecodeError) as fallback_exc:
+                    exc = fallback_exc
+            fallback = self.fallback.generate(prompt, task)
+            logger.warning("DashScope mock fallback for task=%s due to %s", task, exc.__class__.__name__)
+            return f"{fallback}\n\n[DashScope fallback: {exc.__class__.__name__}]"
+
+    def _request(
+        self,
+        prompt: str,
+        task: str,
+        system_prompts: dict[str, str],
+        model: str,
+        max_tokens: int | None,
+    ) -> str:
         payload = {
-            "model": self.model,
+            "model": model,
             "messages": [
                 {"role": "system", "content": system_prompts.get(task, "你是一个严谨的 CS 保研申请助手。")},
                 {"role": "user", "content": prompt},
             ],
             "temperature": 0.2,
         }
-        try:
-            with httpx.Client(timeout=30) as client:
-                response = client.post(
-                    f"{self.base_url.rstrip('/')}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self.api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json=payload,
-                )
-                response.raise_for_status()
-                data = response.json()
-                content = data["choices"][0]["message"]["content"]
-                logger.info("DashScope success for task=%s, chars=%s", task, len(content))
-                return content
-        except (httpx.HTTPError, KeyError, IndexError, json.JSONDecodeError) as exc:
-            fallback = self.fallback.generate(prompt, task)
-            logger.warning("DashScope fallback for task=%s due to %s", task, exc.__class__.__name__)
-            return f"{fallback}\n\n[DashScope fallback: {exc.__class__.__name__}]"
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
+        with httpx.Client(timeout=30) as client:
+            response = client.post(
+                f"{self.base_url.rstrip('/')}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            )
+            response.raise_for_status()
+            data = response.json()
+            content = data["choices"][0]["message"]["content"]
+            logger.info("DashScope success for task=%s model=%s chars=%s", task, model, len(content))
+            return content
 
 
 def get_llm_provider() -> MockLLMProvider | DashScopeProvider:

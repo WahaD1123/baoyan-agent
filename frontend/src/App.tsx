@@ -54,6 +54,12 @@ function App() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [analyzingProfile, setAnalyzingProfile] = useState(false);
   const [planning, setPlanning] = useState(false);
+  const [askingKnowledge, setAskingKnowledge] = useState(false);
+  const [documentBusy, setDocumentBusy] = useState(false);
+  const [advisorBusy, setAdvisorBusy] = useState(false);
+  const [advisorSearchBusy, setAdvisorSearchBusy] = useState(false);
+  const [matchingAdvisors, setMatchingAdvisors] = useState(false);
+  const [knowledgeStatus, setKnowledgeStatus] = useState("资料库已就绪，可以导入资料、提问或匹配导师。");
 
   useEffect(() => {
     Promise.all([api.getProfile(), api.getDocuments(), api.getAdvisors(), api.getWorkflows(), api.getLlmHealth()]).then(
@@ -114,49 +120,100 @@ function App() {
   }
 
   async function addTextDocument(payload: { title: string; doc_type: string; content: string; source: string }) {
-    const result = await api.addTextDocument(payload);
-    setDocuments((items) => [result.document, ...items.filter((item) => item.id !== result.document.id)]);
-    pushWorkflow(result.workflow);
+    setDocumentBusy(true);
+    setKnowledgeStatus("正在解析文本资料，生成全文分析和引用片段...");
+    try {
+      const result = await api.addTextDocument(payload);
+      setDocuments((items) => [result.document, ...items.filter((item) => item.id !== result.document.id)]);
+      pushWorkflow(result.workflow);
+      setKnowledgeStatus(`文本资料「${result.document.title}」已完成入库和全文分析。`);
+    } finally {
+      setDocumentBusy(false);
+    }
   }
 
   async function addUrlDocument(payload: { title?: string; doc_type: string; url: string }) {
-    const result = await api.addUrlDocument(payload);
-    setDocuments((items) => [result.document, ...items.filter((item) => item.id !== result.document.id)]);
-    pushWorkflow(result.workflow);
+    setDocumentBusy(true);
+    setKnowledgeStatus("正在抓取网页、清洗正文，并生成全文分析...");
+    try {
+      const result = await api.addUrlDocument(payload);
+      setDocuments((items) => [result.document, ...items.filter((item) => item.id !== result.document.id)]);
+      pushWorkflow(result.workflow);
+      setKnowledgeStatus(`网页资料「${result.document.title}」已完成入库和全文分析。`);
+    } finally {
+      setDocumentBusy(false);
+    }
   }
 
   async function uploadPdfDocument(file: File, docType: string, title: string) {
-    const result = await api.uploadPdfDocument(file, docType, title);
-    setDocuments((items) => [result.document, ...items.filter((item) => item.id !== result.document.id)]);
-    pushWorkflow(result.workflow);
+    setDocumentBusy(true);
+    setKnowledgeStatus("正在解析 PDF 正文，抽取结构化字段和引用片段...");
+    try {
+      const result = await api.uploadPdfDocument(file, docType, title);
+      setDocuments((items) => [result.document, ...items.filter((item) => item.id !== result.document.id)]);
+      pushWorkflow(result.workflow);
+      setKnowledgeStatus(`PDF「${result.document.title}」已完成入库和全文分析。`);
+    } finally {
+      setDocumentBusy(false);
+    }
   }
 
   async function addAdvisorUrl(url: string, title?: string) {
-    const result = await api.addAdvisorUrl(url, title);
-    setAdvisors((items) => [result.advisor, ...items.filter((item) => item.id !== result.advisor.id)]);
-    setDocuments((items) => [result.document, ...items.filter((item) => item.id !== result.document.id)]);
-    pushWorkflow(result.workflow);
+    setAdvisorBusy(true);
+    setKnowledgeStatus("正在抓取导师主页，抽取姓名、单位、研究方向和适合背景...");
+    try {
+      const result = await api.addAdvisorUrl(url, title);
+      setAdvisors((items) => [result.advisor, ...items.filter((item) => item.id !== result.advisor.id)]);
+      setDocuments((items) => [result.document, ...items.filter((item) => item.id !== result.document.id)]);
+      pushWorkflow(result.workflow);
+      setKnowledgeStatus(`导师「${result.advisor.name}」已入库，可用于匹配。`);
+    } finally {
+      setAdvisorBusy(false);
+    }
   }
 
   async function searchAdvisor(payload: { university: string; direction: string; keywords: string[] }) {
-    const result = await api.searchAdvisors(payload);
-    setAdvisors(result.advisors);
-    setAnswer(result.message);
+    setAdvisorSearchBusy(true);
+    setKnowledgeStatus("正在检索本地导师库...");
+    try {
+      const result = await api.searchAdvisors(payload);
+      setAdvisors(result.advisors);
+      setAnswer(result.message);
+      setKnowledgeStatus(`已找到 ${result.advisors.length} 位候选导师。`);
+    } finally {
+      setAdvisorSearchBusy(false);
+    }
   }
 
   async function askKnowledge(question: string) {
-    const result = await api.askKnowledge(question);
-    setAnswer(result.answer);
-    setChunks(result.chunks);
-    pushWorkflow(result.workflow);
+    setAskingKnowledge(true);
+    setChunks([]);
+    setKnowledgeStatus("正在读取全文分析结果并召回引用片段...");
+    setAnswer("正在读取资料库、核对引用来源，并组织回答...");
+    try {
+      const result = await api.askKnowledge(question);
+      setAnswer(result.answer);
+      setChunks(result.chunks);
+      pushWorkflow(result.workflow);
+      setKnowledgeStatus(`问答完成，已返回 ${result.chunks.length} 条引用片段。`);
+    } finally {
+      setAskingKnowledge(false);
+    }
   }
 
   async function matchAdvisors() {
-    const result = await api.matchAdvisors(profile);
-    setMatches(result.matches);
-    setAdvisors(result.matches.map((match) => match.advisor));
-    setAnswer("已根据你的研究兴趣和项目背景生成导师匹配建议。");
-    pushWorkflow(result.workflow);
+    setMatchingAdvisors(true);
+    setKnowledgeStatus("正在读取用户画像和导师结构化资料，计算匹配分数...");
+    try {
+      const result = await api.matchAdvisors(profile);
+      setMatches(result.matches);
+      setAdvisors(result.matches.map((match) => match.advisor));
+      setAnswer("已根据你的研究兴趣和项目背景生成导师匹配建议。");
+      pushWorkflow(result.workflow);
+      setKnowledgeStatus(`导师匹配完成，生成 ${result.matches.length} 条推荐结果。`);
+    } finally {
+      setMatchingAdvisors(false);
+    }
   }
 
   async function generateEmail() {
@@ -287,6 +344,12 @@ function App() {
             documents={documents}
             advisors={advisors}
             answer={answer}
+            isAsking={askingKnowledge}
+            documentBusy={documentBusy}
+            advisorBusy={advisorBusy}
+            advisorSearchBusy={advisorSearchBusy}
+            matchingAdvisors={matchingAdvisors}
+            statusText={knowledgeStatus}
             chunks={chunks}
             matches={matches}
             onAddText={addTextDocument}

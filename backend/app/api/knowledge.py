@@ -12,9 +12,9 @@ from app.models import (
     KnowledgeResponse,
     UrlDocumentRequest,
 )
+from app.services.library_router import route_chunks_for_documents, route_documents_by_library
 from app.services.store import store
 from app.tools.document_processing import extract_text_from_pdf, prepare_document
-from app.tools.retrieval import hybrid_retrieve, search_documents
 from app.tools.web_crawler import crawl_url
 from app.workflows import run_advisor_match_workflow, run_ingest_workflow, run_knowledge_workflow, score_advisors
 
@@ -100,9 +100,8 @@ def add_url_document(payload: UrlDocumentRequest) -> dict[str, object]:
 
 @router.post("/query", response_model=KnowledgeResponse)
 def query_knowledge(payload: KnowledgeQuery) -> KnowledgeResponse:
-    chunks = hybrid_retrieve(store.documents, payload.question, payload.top_k)
-    doc_ids = {chunk.document_id for chunk in chunks}
-    docs = [document for document in store.documents if document.id in doc_ids] or search_documents(store.documents, payload.question, payload.top_k)
+    docs = route_documents_by_library(payload.question, store.documents, payload.top_k)
+    chunks = route_chunks_for_documents(payload.question, docs, payload.top_k)
     workflow = run_knowledge_workflow(payload.question, docs, chunks)
     store.add_workflow(workflow)
     return KnowledgeResponse(answer=workflow.final_result, documents=docs, chunks=chunks, workflow=workflow)
@@ -135,7 +134,7 @@ def add_advisor_from_url(payload: AdvisorUrlRequest) -> dict[str, object]:
         department=str(extracted.get("department") or "Computer Science"),
         research_areas=[str(item) for item in extracted.get("research_areas", document.keywords[:5])],
         homepage=payload.url,
-        summary=str(extracted.get("llm_summary") or document.content[:400]),
+        summary=str(document.analysis.get("summary") or extracted.get("llm_summary") or document.content[:400]),
         representative_works=[str(item) for item in extracted.get("representative_works", [])],
         suitable_background=str(extracted.get("suitable_background") or ""),
         source_document_id=document.id,

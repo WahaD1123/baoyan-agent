@@ -1,4 +1,4 @@
-import type { FormEvent } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Section } from "../components/Section";
 import type { Advisor, AdvisorMatchResult, DocumentItem, RetrievedChunk } from "../types/domain";
 
@@ -6,6 +6,12 @@ type Props = {
   documents: DocumentItem[];
   advisors: Advisor[];
   answer: string;
+  isAsking: boolean;
+  documentBusy: boolean;
+  advisorBusy: boolean;
+  advisorSearchBusy: boolean;
+  matchingAdvisors: boolean;
+  statusText: string;
   chunks: RetrievedChunk[];
   matches: AdvisorMatchResult[];
   onAddText: (payload: { title: string; doc_type: string; content: string; source: string }) => void;
@@ -30,6 +36,12 @@ export function KnowledgePage(props: Props) {
     documents,
     advisors,
     answer,
+    isAsking,
+    documentBusy,
+    advisorBusy,
+    advisorSearchBusy,
+    matchingAdvisors,
+    statusText,
     chunks,
     matches,
     onAddText,
@@ -76,6 +88,19 @@ export function KnowledgePage(props: Props) {
     event.currentTarget.reset();
   }
 
+  function sharedDocumentType(form: HTMLFormElement, fallbackType = "notice") {
+    const rootForm = form.closest(".flowPanel")?.querySelector(".inlineForm") as HTMLFormElement | null;
+    const rootData = rootForm ? new FormData(rootForm) : new FormData();
+    return String(rootData.get("doc_type") || fallbackType);
+  }
+
+  function setHiddenSharedFields(form: HTMLFormElement, title: string, fallbackType = "notice") {
+    const titleInput = form.querySelector<HTMLInputElement>('input[name="title"]');
+    const docTypeInput = form.querySelector<HTMLInputElement>('input[name="doc_type"]');
+    if (titleInput) titleInput.value = title;
+    if (docTypeInput) docTypeInput.value = sharedDocumentType(form, fallbackType);
+  }
+
   function handleAdvisorUrlSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -102,6 +127,153 @@ export function KnowledgePage(props: Props) {
     onAsk(String(form.get("question") || "这个夏令营需要哪些材料？"));
   }
 
+  const [typedAnswer, setTypedAnswer] = useState(answer);
+  const [isTyping, setIsTyping] = useState(false);
+
+  useEffect(() => {
+    const characters = Array.from(answer);
+    let index = 0;
+    setTypedAnswer("");
+    setIsTyping(characters.length > 0);
+
+    const timer = window.setInterval(() => {
+      index += 1;
+      setTypedAnswer(characters.slice(0, index).join(""));
+      if (index >= characters.length) {
+        window.clearInterval(timer);
+        setIsTyping(false);
+      }
+    }, characters.length > 700 ? 8 : 14);
+
+    return () => window.clearInterval(timer);
+  }, [answer]);
+
+  function documentInsight(document: DocumentItem) {
+    const analysis = document.analysis ?? {};
+    const requirements = Array.isArray(analysis.requirements) ? analysis.requirements.slice(0, 3).join(", ") : "";
+    const dates = Array.isArray(analysis.important_dates) ? analysis.important_dates.slice(0, 2).join(", ") : "";
+    if (analysis.status === "completed") {
+      return ["已完成全文分析", requirements && `材料: ${requirements}`, dates && `时间: ${dates}`]
+        .filter(Boolean)
+        .join(" · ");
+    }
+    return document.keywords.slice(0, 4).join(", ") || document.content.slice(0, 54);
+  }
+
+  function renderInline(text: string): ReactNode[] {
+    return text.split(/(\*\*[^*]+\*\*)/g).filter(Boolean).map((part, index) => {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        return <strong key={index}>{part.slice(2, -2)}</strong>;
+      }
+      return part;
+    });
+  }
+
+  function renderMarkdown(text: string) {
+    const lines = text.split(/\r?\n/);
+    const nodes: ReactNode[] = [];
+    let index = 0;
+
+    while (index < lines.length) {
+      const rawLine = lines[index];
+      const line = rawLine.trim();
+      if (!line) {
+        index += 1;
+        continue;
+      }
+
+      const heading = line.match(/^(#{1,4})\s+(.+)$/);
+      if (heading) {
+        const level = Math.min(heading[1].length, 4);
+        const Tag = `h${level + 2}` as keyof JSX.IntrinsicElements;
+        nodes.push(<Tag key={`heading-${index}`}>{renderInline(heading[2])}</Tag>);
+        index += 1;
+        continue;
+      }
+
+      if (isMarkdownTableStart(lines, index)) {
+        const headers = splitTableRow(lines[index]);
+        index += 2;
+        const rows: string[][] = [];
+        while (index < lines.length && isTableRow(lines[index])) {
+          rows.push(splitTableRow(lines[index]));
+          index += 1;
+        }
+        nodes.push(
+          <div className="markdownTableWrap" key={`table-${index}`}>
+            <table>
+              <thead>
+                <tr>
+                  {headers.map((cell, cellIndex) => (
+                    <th key={`head-${cellIndex}`}>{renderInline(cell)}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, rowIndex) => (
+                  <tr key={`row-${rowIndex}`}>
+                    {headers.map((_, cellIndex) => (
+                      <td key={`cell-${rowIndex}-${cellIndex}`}>{renderInline(row[cellIndex] ?? "")}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+        continue;
+      }
+
+      if (line.startsWith(">")) {
+        nodes.push(<blockquote key={`quote-${index}`}>{renderInline(line.replace(/^>\s?/, ""))}</blockquote>);
+        index += 1;
+        continue;
+      }
+
+      if (/^[-*]\s+/.test(line)) {
+        const items: ReactNode[] = [];
+        while (index < lines.length && /^[-*]\s+/.test(lines[index].trim())) {
+          items.push(<li key={`ul-${index}`}>{renderInline(lines[index].trim().replace(/^[-*]\s+/, ""))}</li>);
+          index += 1;
+        }
+        nodes.push(<ul key={`list-${index}`}>{items}</ul>);
+        continue;
+      }
+
+      if (/^\d+\.\s+/.test(line)) {
+        const items: ReactNode[] = [];
+        while (index < lines.length && /^\d+\.\s+/.test(lines[index].trim())) {
+          items.push(<li key={`ol-${index}`}>{renderInline(lines[index].trim().replace(/^\d+\.\s+/, ""))}</li>);
+          index += 1;
+        }
+        nodes.push(<ol key={`list-${index}`}>{items}</ol>);
+        continue;
+      }
+
+      nodes.push(<p key={`p-${index}`}>{renderInline(line)}</p>);
+      index += 1;
+    }
+
+    return nodes;
+  }
+
+  function isTableRow(line: string) {
+    const trimmed = line.trim();
+    return trimmed.startsWith("|") && trimmed.endsWith("|") && trimmed.split("|").length >= 4;
+  }
+
+  function isMarkdownTableStart(lines: string[], index: number) {
+    if (!isTableRow(lines[index]) || !lines[index + 1]) {
+      return false;
+    }
+    const separatorCells = splitTableRow(lines[index + 1]);
+    return separatorCells.length > 0 && separatorCells.every((cell) => /^:?-{3,}:?$/.test(cell.replace(/\s/g, "")));
+  }
+
+  function splitTableRow(line: string) {
+    return line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim());
+  }
+
   return (
     <Section title="资料库与导师匹配" eyebrow="成员 B 模块">
       <div className="flowSteps">
@@ -122,6 +294,12 @@ export function KnowledgePage(props: Props) {
         </article>
       </div>
 
+      <div className="operationStatus" aria-live="polite">
+        <span className={documentBusy || advisorBusy || advisorSearchBusy || matchingAdvisors || isAsking ? "statusDot active" : "statusDot"} />
+        <strong>当前进度</strong>
+        <p>{statusText}</p>
+      </div>
+
       <div className="knowledgeFlow">
         <div className="mainFlow">
           <div className="panel flowPanel">
@@ -139,38 +317,46 @@ export function KnowledgePage(props: Props) {
                 <option value="advisor">导师主页</option>
                 <option value="other">其他资料</option>
               </select>
-              <input name="url" placeholder="粘贴院校通知、经验贴或导师主页 URL" />
-              <input name="title" placeholder="标题，可不填" />
-              <button type="submit">抓取资料</button>
+              <input name="url" placeholder="这里粘贴网页链接，例如院校通知 URL / 导师主页 URL" />
+              <input name="title" type="hidden" />
+              <button type="submit" disabled={documentBusy}>{documentBusy ? "处理中" : "抓取资料"}</button>
             </form>
 
-            <details className="softDetails">
-              <summary>上传 PDF 或粘贴文本</summary>
+            <div className="importAlternatives">
+              <div className="subSectionTitle">
+                <span>网页抓不了时，用下面两种方式</span>
+                <p>PDF 放左边；知乎、小红书、公众号正文复制后放右边。</p>
+              </div>
               <div className="compactForms">
-                <form className="stackForm" onSubmit={handlePdfSubmit}>
-                  <input name="title" placeholder="PDF 标题，可不填" />
-                  <select name="doc_type" defaultValue="notice">
-                    <option value="notice">院校通知</option>
-                    <option value="experience">经验贴</option>
-                    <option value="resume">简历材料</option>
-                  </select>
+                <form className="stackForm" onSubmit={(event) => {
+                  setHiddenSharedFields(event.currentTarget, "", "notice");
+                  handlePdfSubmit(event);
+                }}>
+                  <div className="formHint">
+                    <strong>上传通知 PDF</strong>
+                    <span>使用上方选择的资料类型和资料名称。</span>
+                  </div>
+                  <input name="title" type="hidden" />
+                  <input name="doc_type" type="hidden" />
                   <input name="file" type="file" accept="application/pdf" />
-                  <button type="submit">上传 PDF</button>
+                  <button type="submit" disabled={documentBusy}>{documentBusy ? "解析中" : "上传 PDF"}</button>
                 </form>
 
-                <form className="stackForm" onSubmit={handleTextSubmit}>
-                  <input name="title" placeholder="文本资料标题" />
-                  <select name="doc_type" defaultValue="experience">
-                    <option value="notice">院校通知</option>
-                    <option value="experience">经验贴</option>
-                    <option value="advisor">导师资料</option>
-                    <option value="other">其他资料</option>
-                  </select>
-                  <textarea name="content" placeholder="粘贴通知、经验贴或导师资料" rows={5} />
-                  <button type="submit">添加文本</button>
+                <form className="stackForm" onSubmit={(event) => {
+                  setHiddenSharedFields(event.currentTarget, "手动资料", "experience");
+                  handleTextSubmit(event);
+                }}>
+                  <div className="formHint">
+                    <strong>粘贴正文内容</strong>
+                    <span>知乎、公众号、小红书等复制正文放这里。</span>
+                  </div>
+                  <input name="title" type="hidden" />
+                  <input name="doc_type" type="hidden" />
+                  <textarea name="content" placeholder="把网页正文复制到这里，例如经验贴全文、通知正文、导师介绍" rows={5} />
+                  <button type="submit" disabled={documentBusy}>{documentBusy ? "分析中" : "添加文本"}</button>
                 </form>
               </div>
-            </details>
+            </div>
           </div>
 
           <div className="panel flowPanel">
@@ -183,15 +369,18 @@ export function KnowledgePage(props: Props) {
             </div>
             <form className="queryBar" onSubmit={handleQuestion}>
               <input name="question" placeholder="例如：这个夏令营需要哪些材料？报名什么时候截止？" />
-              <button type="submit">查询</button>
+              <button type="submit" disabled={isAsking}>{isAsking ? "分析中" : "查询"}</button>
             </form>
 
-            <div className="answerPanel compactAnswer">
+            <div className={`answerPanel compactAnswer ${isAsking ? "isThinking" : ""}`}>
               <div className="panelHeader">
                 <h3>回答结果</h3>
-                <span>带资料来源</span>
+                <span>{isAsking ? "正在读取资料" : isTyping ? "正在生成" : "带资料来源"}</span>
               </div>
-              <pre>{answer}</pre>
+              <div className="markdownAnswer">
+                {renderMarkdown(typedAnswer)}
+                {(isTyping || isAsking) && <span className="typeCursor" aria-hidden="true" />}
+              </div>
             </div>
 
             <details className="dropdownList evidenceDropdown">
@@ -221,15 +410,17 @@ export function KnowledgePage(props: Props) {
             <form className="miniForm" onSubmit={handleAdvisorUrlSubmit}>
               <input name="advisor_url" placeholder="导师主页 URL" />
               <input name="advisor_title" placeholder="标题，可不填" />
-              <button type="submit">抓取导师</button>
+              <button type="submit" disabled={advisorBusy}>{advisorBusy ? "抓取中" : "抓取导师"}</button>
             </form>
             <form className="miniForm compactSearch" onSubmit={handleAdvisorSearch}>
               <input name="university" placeholder="学校" />
               <input name="direction" placeholder="方向" />
               <input name="keywords" placeholder="关键词" />
-              <button type="submit">搜索</button>
+              <button type="submit" disabled={advisorSearchBusy}>{advisorSearchBusy ? "搜索中" : "搜索"}</button>
             </form>
-            <button className="wideAction" onClick={onMatch}>生成导师匹配</button>
+            <button className="wideAction" onClick={onMatch} disabled={matchingAdvisors}>
+              {matchingAdvisors ? "匹配中" : "生成导师匹配"}
+            </button>
           </div>
 
           <div className="panel">
@@ -258,7 +449,7 @@ export function KnowledgePage(props: Props) {
                 <article key={document.id}>
                   <strong>{document.title}</strong>
                   <span>{typeLabels[document.doc_type] ?? document.doc_type} / {document.source_type}</span>
-                  <p>{document.keywords.slice(0, 4).join(", ") || document.content.slice(0, 54)}</p>
+                  <p>{documentInsight(document)}</p>
                 </article>
               ))}
               {documents.length > 2 ? (
@@ -269,7 +460,7 @@ export function KnowledgePage(props: Props) {
                       <article key={document.id}>
                         <strong>{document.title}</strong>
                         <span>{typeLabels[document.doc_type] ?? document.doc_type} / {document.source_type}</span>
-                        <p>{document.keywords.slice(0, 4).join(", ") || document.content.slice(0, 54)}</p>
+                        <p>{documentInsight(document)}</p>
                       </article>
                     ))}
                   </div>

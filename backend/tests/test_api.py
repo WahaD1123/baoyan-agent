@@ -1,6 +1,10 @@
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.models import Document
+from app.services.library_router import route_documents_by_library
+from app.tools.document_processing import prepare_document
+from app.tools.retrieval import hybrid_retrieve
 
 
 client = TestClient(app)
@@ -56,6 +60,87 @@ def test_member_b_text_ingest_query_and_match() -> None:
     match = client.post("/api/knowledge/advisors/match", json={"profile": profile, "top_k": 2})
     assert match.status_code == 200
     assert match.json()["matches"]
+
+
+def test_member_b_full_analysis_and_advisor_extraction() -> None:
+    notice = prepare_document(
+        Document(
+            title="Example University CS Summer Camp",
+            doc_type="notice",
+            source_type="text",
+            content=(
+                "Example University summer camp requires resume, transcript, ranking certificate, "
+                "research statement, and professional interview. Deadline: 2026-06-30."
+            ),
+        )
+    )
+    assert notice.analysis["status"] == "completed"
+    assert notice.analysis["mode"] == "full_document_analysis"
+    assert "resume" in notice.analysis["requirements"]
+
+    advisor = prepare_document(
+        Document(
+            title="Zhi-Hua Zhou's Homepage",
+            doc_type="advisor",
+            source_type="url",
+            source="http://cs.nju.edu.cn/zhouzh/",
+            content=(
+                "Professor Zhi-Hua Zhou is with the Department of Computer Science and Technology, "
+                "Nanjing University. His research interests include machine learning, data mining, "
+                "artificial intelligence and pattern recognition."
+            ),
+        )
+    )
+    assert advisor.extracted["name"] == "Zhi-Hua Zhou"
+    assert "Nanjing University" in advisor.extracted["university"]
+    assert "machine learning" in advisor.extracted["research_areas"]
+    assert "version" not in advisor.extracted["research_areas"]
+
+    xmu_advisor = prepare_document(
+        Document(
+            title="纪荣嵘-厦门大学信息学院",
+            doc_type="advisor",
+            source_type="url",
+            source="https://informatics.xmu.edu.cn/info/1033/177381.htm",
+            content=(
+                "杰出人才\n"
+                "纪荣嵘\n"
+                "国家杰青、国家优青、南强特聘教授；博士生导师\n"
+                "厦门大学校长助理、人工智能研究院负责人\n"
+                "研究方向：计算机视觉、机器学习\n"
+                "主要研究方向为计算机视觉、多媒体技术和机器学习。"
+            ),
+        )
+    )
+    assert xmu_advisor.extracted["name"] == "纪荣嵘"
+    assert xmu_advisor.extracted["university"] == "厦门大学"
+    assert "计算机视觉" in xmu_advisor.extracted["research_areas"]
+
+
+def test_member_b_direct_phd_question_prefers_experience_posts() -> None:
+    experience = prepare_document(
+        Document(
+            title="保研经验贴",
+            doc_type="experience",
+            source_type="text",
+            content="尽早想清楚自己要不要直博，和家人沟通好，避免拿到直博 offer 后又放弃。",
+        )
+    )
+    advisor = prepare_document(
+        Document(
+            title="某教授主页",
+            doc_type="advisor",
+            source_type="url",
+            content="教授，博士生导师，发表多篇论文，长期招收博士生和硕士生。",
+        )
+    )
+    chunks = hybrid_retrieve([advisor, experience], "要不要直博", top_k=2)
+    assert chunks
+    assert chunks[0].document_title == "保研经验贴"
+
+    selected = route_documents_by_library("要不要直博", [advisor, experience], limit=2)
+    assert selected
+    assert selected[0].title == "保研经验贴"
 
 
 def _assert_member_c_workflow(payload: dict, workflow_type: str, content_label: str) -> None:

@@ -58,14 +58,28 @@ def run_planning_workflow(profile: StudentProfile) -> WorkflowRun:
 
 def run_knowledge_workflow(question: str, documents: list[Document], chunks: list[RetrievedChunk] | None = None) -> WorkflowRun:
     refs = [doc.title for doc in documents]
+    analyses = "\n\n".join(
+        (
+            f"Document: {doc.title}\n"
+            f"Type: {doc.doc_type}\n"
+            f"Full analysis summary: {doc.analysis.get('summary', '')}\n"
+            f"Structured fields: {doc.analysis.get('structured_fields', doc.extracted)}\n"
+            f"Important dates: {doc.analysis.get('important_dates', [])}\n"
+            f"Requirements: {doc.analysis.get('requirements', [])}\n"
+            f"Risks: {doc.analysis.get('risks', [])}"
+        )
+        for doc in documents
+    )
     evidence = "\n\n".join(
         f"[{idx + 1}] {chunk.document_title} score={chunk.score}\n{chunk.text}"
         for idx, chunk in enumerate(chunks or [])
     )
     prompt = (
         f"Question: {question}\n"
-        f"Retrieved evidence:\n{evidence or ', '.join(refs)}\n"
-        "Answer in Chinese. Cite source titles explicitly. If evidence is insufficient, say what is missing."
+        f"Full document analyses from ingestion:\n{analyses or 'none'}\n\n"
+        f"Original citation chunks:\n{evidence or ', '.join(refs)}\n"
+        "Answer in Chinese. If relevant documents are provided, prefer the structured full-document analysis and support it with original citation chunks. "
+        "If no relevant document is provided, clearly say the knowledge base has no matching evidence, then answer from general reasoning without citing unrelated sources."
     )
     result = KnowledgeAgent().run(prompt, refs)
     critic = CriticAgent().run(
@@ -75,10 +89,10 @@ def run_knowledge_workflow(question: str, documents: list[Document], chunks: lis
     return _workflow(
         "knowledge",
         [
-            WorkflowStep(name="Hybrid retrieve document chunks", agent_result=result),
+            WorkflowStep(name="Route question over full library catalog and read selected evidence", agent_result=result),
             WorkflowStep(name="Grounding critic review", agent_result=critic),
         ],
-        f"{result.output}\n\n引用来源: {', '.join(refs) if refs else '无'}",
+        f"{result.output}\n\n引用来源: {', '.join(refs) if refs else '资料库未命中，以上为通用建议'}",
     )
 
 
@@ -151,7 +165,13 @@ def run_advisor_match_workflow(
 
 def run_ingest_workflow(document: Document, source_label: str) -> WorkflowRun:
     summary = get_llm_provider().generate(
-        f"资料标题: {document.title}\n类型: {document.doc_type}\n结构化字段: {document.extracted}\n正文摘要材料:\n{document.content[:2500]}",
+        (
+            f"资料标题: {document.title}\n"
+            f"类型: {document.doc_type}\n"
+            f"结构化字段: {document.extracted}\n"
+            f"全文分析结果: {document.analysis}\n"
+            f"正文材料:\n{document.content[:2500]}"
+        ),
         task="extract",
     )
     result = KnowledgeAgent().run(
@@ -162,9 +182,9 @@ def run_ingest_workflow(document: Document, source_label: str) -> WorkflowRun:
     return _workflow(
         "knowledge_ingest",
         [
-            WorkflowStep(name=f"Parse {source_label}", agent_result=result),
+            WorkflowStep(name=f"Parse and analyze full {source_label}", agent_result=result),
         ],
-        f"已入库: {document.title} ({len(document.chunks)} chunks)",
+        f"已入库并完成全文分析: {document.title} ({len(document.chunks)} chunks)",
     )
 
 

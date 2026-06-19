@@ -48,6 +48,7 @@ class DocumentCreate(BaseModel):
     source: str = "manual"
     source_type: SourceType = "text"
     extracted: dict[str, Any] = Field(default_factory=dict)
+    analysis: dict[str, Any] = Field(default_factory=dict)
 
 
 class Document(DocumentCreate):

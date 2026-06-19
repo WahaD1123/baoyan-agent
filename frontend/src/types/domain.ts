@@ -28,6 +28,7 @@ export type DocumentItem = {
   keywords: string[];
   chunks: DocumentChunk[];
   extracted: Record<string, unknown>;
+  analysis?: Record<string, unknown>;
   created_at: string;
 };
 

@@ -24,7 +24,7 @@ def _settings() -> SimpleNamespace:
         llm_critic_model="qwen3.6-flash",
         llm_critic_max_tokens=400,
         llm_member_c_fallback_model="qwen3.6-flash",
-        llm_member_c_max_tokens=800,
+        llm_member_c_max_tokens=1200,
     )
 
 
@@ -81,4 +81,4 @@ def test_member_c_generation_falls_back_to_flash(monkeypatch) -> None:
 
     assert output == "flash result"
     assert [call["payload"]["model"] for call in calls] == ["qwen3.7-plus", "qwen3.6-flash"]
-    assert all(call["payload"]["max_tokens"] == 800 for call in calls)
+    assert all(call["payload"]["max_tokens"] == 1200 for call in calls)

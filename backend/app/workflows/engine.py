@@ -212,6 +212,8 @@ def _run_material_generation(
     review = CriticAgent().run(
         (
             f"请审查以下保研申请材料是否具体、克制、有证据，指出空话和改写建议。\n"
+            "仅输出总体评价、最多 3 条证据风险和最多 3 条改写建议。"
+            "不要使用 Markdown 表格，总字数控制在 400 字以内。\n"
             f"材料类型: {title}\n"
             f"材料内容:\n{draft.output}"
         ),
@@ -236,6 +238,7 @@ def run_material_email_workflow(profile: StudentProfile, advisor: Advisor | None
     prompt = (
         "material_kind=advisor_email\n"
         "请生成一封中文导师联系邮件，语气礼貌克制，包含称呼、自我介绍、研究匹配、附件说明和结尾。\n"
+        "正文控制在 600 字以内。只使用学生画像和导师信息中已有事实，缺失联系方式使用占位符，不得编造。\n"
         f"申请目的: {purpose}\n"
         f"学生画像:\n{_profile_brief(profile)}\n"
         f"导师信息: {advisor_text}"
@@ -247,7 +250,8 @@ def run_material_email_workflow(profile: StudentProfile, advisor: Advisor | None
 def run_resume_highlights_workflow(profile: StudentProfile, target_direction: str) -> WorkflowRun:
     prompt = (
         "material_kind=resume_highlights\n"
-        "请把学生经历改写成 4 条中文保研简历亮点。每条使用 动作-方法-结果-匹配方向 的结构，避免夸大。\n"
+        "请把学生经历改写成 4 条中文保研简历亮点。每条使用 动作-方法-结果-匹配方向 的结构，每条不超过 100 字。"
+        "只使用画像中的事实；没有量化结果时明确写待补充，不得编造指标、技术栈或奖项等级。\n"
         f"目标方向: {target_direction}\n"
         f"学生画像:\n{_profile_brief(profile)}"
     )
@@ -258,6 +262,7 @@ def run_statement_workflow(profile: StudentProfile, target_school: str, directio
     prompt = (
         "material_kind=personal_statement\n"
         "请生成一段中文个人陈述片段，包含研究兴趣来源、项目经历支撑、目标方向匹配和后续计划。\n"
+        "正文控制在 700 字以内，只使用学生画像中的事实，不得编造课程成绩、实验指标、论文或工具经验。\n"
         f"目标学校: {target_school}\n"
         f"申请方向: {direction}\n"
         f"语气要求: {tone}\n"
@@ -274,7 +279,9 @@ def run_interview_workflow(profile: StudentProfile, target_school: str, directio
     interview = InterviewAgent().run(
         (
             "interview_kind=categorized_mock\n"
-            "请生成中文 CS 保研模拟面试题，按 项目追问、专业基础、科研方向、英文面试、复盘建议 分类。\n"
+            "请生成中文 CS 保研模拟面试题，按项目追问、专业基础、科研方向、英文面试、复盘建议分类。"
+            "项目追问最多 4 题、专业基础最多 4 题、科研方向最多 3 题、英文面试最多 2 题、复盘建议最多 2 条，"
+            "总题量控制在 15 题以内。不要输出面试官自我介绍、提示语或 Markdown 表格。\n"
             f"目标学校: {target_school}\n"
             f"申请方向: {direction}\n"
             f"学生画像:\n{_profile_brief(profile)}"
@@ -283,6 +290,8 @@ def run_interview_workflow(profile: StudentProfile, target_school: str, directio
     review = CriticAgent().run(
         (
             "请审查以下模拟面试题是否覆盖项目、基础、科研和英文表达，并指出还缺少哪些追问。\n"
+            "仅输出总体评价、最多 3 条缺失点和最多 3 条改进建议。"
+            "不要使用 Markdown 表格，总字数控制在 400 字以内。\n"
             f"面试题内容:\n{interview.output}"
         ),
         [interview.id, target_school, direction],

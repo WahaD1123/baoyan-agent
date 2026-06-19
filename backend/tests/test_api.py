@@ -205,3 +205,38 @@ def test_member_c_generates_categorized_interview_with_critic_workflow() -> None
     assert response.status_code == 200
     _assert_member_c_workflow(response.json(), "interview", "模拟面试题")
     assert "项目追问" in response.json()["content"]
+
+
+def test_member_c_prompts_bound_generated_output() -> None:
+    profile = client.get("/api/profile").json()
+    advisor = client.get("/api/knowledge/advisors").json()[0]
+    cases = [
+        (
+            "/api/materials/email",
+            {"profile": profile, "advisor": advisor, "purpose": "summer camp application"},
+            "正文控制在 600 字以内",
+        ),
+        (
+            "/api/materials/resume-highlights",
+            {"profile": profile, "target_direction": "AI systems"},
+            "每条不超过 100 字",
+        ),
+        (
+            "/api/materials/statement",
+            {"profile": profile, "target_school": "SJTU", "direction": "AI", "tone": "concise"},
+            "正文控制在 700 字以内",
+        ),
+        (
+            "/api/interview/mock",
+            {"profile": profile, "target_school": "SJTU", "direction": "AI"},
+            "总题量控制在 15 题以内",
+        ),
+    ]
+
+    for path, payload, generation_rule in cases:
+        response = client.post(path, json=payload)
+        assert response.status_code == 200
+        steps = response.json()["workflow"]["steps"]
+        assert generation_rule in steps[0]["agent_result"]["input_summary"]
+        assert "不要使用 Markdown 表格" in steps[1]["agent_result"]["input_summary"]
+        assert "400 字以内" in steps[1]["agent_result"]["input_summary"]

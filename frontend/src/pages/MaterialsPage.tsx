@@ -1,4 +1,5 @@
 import { Section } from "../components/Section";
+import { MarkdownContent } from "../components/MarkdownContent";
 
 type Props = {
   email: string;
@@ -41,28 +42,28 @@ export function MaterialsPage({
             <h3>导师邮件</h3>
             <span>联系初稿</span>
           </div>
-          <pre>{email}</pre>
+          <MarkdownContent content={email} />
         </div>
         <div className="answerPanel light">
           <div className="panelHeader">
             <h3>简历亮点</h3>
             <span>经历包装</span>
           </div>
-          <pre>{resumeHighlights}</pre>
+          <MarkdownContent content={resumeHighlights} />
         </div>
         <div className="answerPanel light">
           <div className="panelHeader">
             <h3>个人陈述</h3>
             <span>申请片段</span>
           </div>
-          <pre>{statement}</pre>
+          <MarkdownContent content={statement} />
         </div>
         <div className="answerPanel light">
           <div className="panelHeader">
             <h3>模拟面试</h3>
             <span>练习清单</span>
           </div>
-          <pre>{interview}</pre>
+          <MarkdownContent content={interview} />
         </div>
       </div>
     </Section>

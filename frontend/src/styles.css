@@ -936,6 +936,112 @@ summary {
   }
 }
 
+.markdownBody {
+  color: #292d27;
+  font-family: "Noto Sans SC", "Microsoft YaHei UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.78;
+  min-height: 132px;
+  overflow-wrap: anywhere;
+}
+
+.markdownBody > :first-child {
+  margin-top: 0;
+}
+
+.markdownBody > :last-child {
+  margin-bottom: 0;
+}
+
+.markdownBody h1,
+.markdownBody h2,
+.markdownBody h3,
+.markdownBody h4 {
+  color: #191b17;
+  font-family: "Noto Serif SC", "Songti SC", serif;
+  letter-spacing: 0;
+  line-height: 1.4;
+}
+
+.markdownBody h1,
+.markdownBody h2 {
+  border-bottom: 1px solid #e1ded3;
+  font-size: 17px;
+  margin: 24px 0 14px;
+  padding-bottom: 8px;
+}
+
+.markdownBody h3 {
+  font-size: 15px;
+  margin: 20px 0 10px;
+}
+
+.markdownBody h4 {
+  font-size: 14px;
+  margin: 16px 0 8px;
+}
+
+.markdownBody p {
+  margin: 0 0 12px;
+}
+
+.markdownBody ul,
+.markdownBody ol {
+  margin: 0 0 14px;
+  padding-left: 24px;
+}
+
+.markdownBody li {
+  margin-bottom: 7px;
+  padding-left: 3px;
+}
+
+.markdownBody blockquote {
+  border-left: 3px solid #9fc345;
+  color: #555b50;
+  margin: 14px 0;
+  padding: 3px 0 3px 14px;
+}
+
+.markdownBody code {
+  background: #f0efe7;
+  border-radius: 4px;
+  color: #2f4b1a;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 0.92em;
+  padding: 2px 5px;
+}
+
+.markdownBody table {
+  border-collapse: collapse;
+  display: block;
+  margin: 14px 0;
+  max-width: 100%;
+  overflow-x: auto;
+  width: max-content;
+}
+
+.markdownBody th,
+.markdownBody td {
+  border: 1px solid #d8d6cb;
+  min-width: 110px;
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.markdownBody th {
+  background: #f2f5e9;
+  color: #30372a;
+  font-weight: 800;
+}
+
+.markdownBody hr {
+  border: 0;
+  border-top: 1px solid #dddacf;
+  margin: 20px 0;
+}
+
 .panelHeader {
   align-items: center;
   display: flex;

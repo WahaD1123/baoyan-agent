@@ -26,7 +26,7 @@ class Settings:
         self.llm_critic_model = os.getenv("LLM_CRITIC_MODEL", "qwen3.6-flash")
         self.llm_critic_max_tokens = _env_int("LLM_CRITIC_MAX_TOKENS", 400)
         self.llm_member_c_fallback_model = os.getenv("LLM_MEMBER_C_FALLBACK_MODEL", "qwen3.6-flash")
-        self.llm_member_c_max_tokens = _env_int("LLM_MEMBER_C_MAX_TOKENS", 800)
+        self.llm_member_c_max_tokens = _env_int("LLM_MEMBER_C_MAX_TOKENS", 1200)
         self.loaded_env_files = list(dict.fromkeys(_loaded_env_files))
         self.expected_env_files = [str(root_env), str(backend_env)]
 

@@ -25,6 +25,13 @@ class Settings:
         self.llm_model = os.getenv("LLM_MODEL", "qwen-vl-max")
         self.llm_critic_model = os.getenv("LLM_CRITIC_MODEL", "qwen3.6-flash")
         self.llm_critic_max_tokens = _env_int("LLM_CRITIC_MAX_TOKENS", 400)
+        self.llm_planner_model = os.getenv("LLM_PLANNER_MODEL", "qwen3.6-flash")
+        self.llm_planner_max_tokens = _env_int("LLM_PLANNER_MAX_TOKENS", 500)
+        self.mcp_server_host = os.getenv("MCP_SERVER_HOST", "127.0.0.1")
+        self.mcp_server_port = _env_int("MCP_SERVER_PORT", 8002)
+        self.mcp_server_url = os.getenv("MCP_SERVER_URL", "http://127.0.0.1:8002/mcp")
+        self.mcp_timeout_seconds = _env_float("MCP_TIMEOUT_SECONDS", 8.0)
+        self.mcp_local_fallback = _env_bool("MCP_LOCAL_FALLBACK", True)
         self.llm_member_c_fallback_model = os.getenv("LLM_MEMBER_C_FALLBACK_MODEL", "qwen3.6-flash")
         self.llm_member_c_max_tokens = _env_int("LLM_MEMBER_C_MAX_TOKENS", 1200)
         self.loaded_env_files = list(dict.fromkeys(_loaded_env_files))
@@ -60,3 +67,17 @@ def _env_int(name: str, default: int) -> int:
         return int(os.getenv(name, str(default)))
     except ValueError:
         return default
+
+
+def _env_float(name: str, default: float) -> float:
+    try:
+        return float(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}

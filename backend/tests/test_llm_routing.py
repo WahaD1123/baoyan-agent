@@ -23,6 +23,8 @@ def _settings() -> SimpleNamespace:
         llm_model="qwen3.7-plus",
         llm_critic_model="qwen3.6-flash",
         llm_critic_max_tokens=400,
+        llm_planner_model="qwen3.6-flash",
+        llm_planner_max_tokens=500,
         llm_member_c_fallback_model="qwen3.6-flash",
         llm_member_c_max_tokens=1200,
     )
@@ -82,3 +84,30 @@ def test_member_c_generation_falls_back_to_flash(monkeypatch) -> None:
     assert output == "flash result"
     assert [call["payload"]["model"] for call in calls] == ["qwen3.7-plus", "qwen3.6-flash"]
     assert all(call["payload"]["max_tokens"] == 1200 for call in calls)
+
+
+def test_workflow_planner_uses_fast_bounded_route(monkeypatch) -> None:
+    calls: list[dict] = []
+
+    class FakeClient:
+        def __init__(self, timeout: int) -> None:
+            self.timeout = timeout
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args) -> None:
+            return None
+
+        def post(self, _url: str, *, headers: dict, json: dict) -> FakeResponse:
+            calls.append({"timeout": self.timeout, "headers": headers, "payload": json})
+            return FakeResponse('{"goal":"generate_statement","steps":[]}')
+
+    monkeypatch.setattr(llm_module, "get_settings", _settings)
+    monkeypatch.setattr(llm_module.httpx, "Client", FakeClient)
+
+    output = llm_module.DashScopeProvider().generate("plan this", task="workflow_planner")
+
+    assert output.startswith('{"goal"')
+    assert calls[0]["payload"]["model"] == "qwen3.6-flash"
+    assert calls[0]["payload"]["max_tokens"] == 500

@@ -7,6 +7,7 @@ from app.models.schemas import (
     AdvisorUrlRequest,
     AgentResult,
     CrawlResult,
+    CriticDecision,
     Document,
     DocumentChunk,
     DocumentCreate,
@@ -26,6 +27,7 @@ from app.models.schemas import (
     StatementRequest,
     StudentProfile,
     UrlDocumentRequest,
+    ToolCallTrace,
     WorkflowRun,
     WorkflowStep,
 )
@@ -39,6 +41,7 @@ __all__ = [
     "AdvisorUrlRequest",
     "AgentResult",
     "CrawlResult",
+    "CriticDecision",
     "Document",
     "DocumentChunk",
     "DocumentCreate",
@@ -58,6 +61,7 @@ __all__ = [
     "StatementRequest",
     "StudentProfile",
     "UrlDocumentRequest",
+    "ToolCallTrace",
     "WorkflowRun",
     "WorkflowStep",
 ]

@@ -5,6 +5,7 @@ import { KnowledgePage } from "./pages/KnowledgePage";
 import { MaterialsPage } from "./pages/MaterialsPage";
 import { PlanningPage } from "./pages/PlanningPage";
 import { ProfilePage } from "./pages/ProfilePage";
+import { WorkflowPage } from "./pages/WorkflowPage";
 import type {
   Advisor,
   AdvisorMatchResult,
@@ -16,13 +17,14 @@ import type {
   WorkflowRun,
 } from "./types/domain";
 
-type PageKey = "profile" | "planning" | "knowledge" | "materials";
+type PageKey = "profile" | "planning" | "knowledge" | "materials" | "workflows";
 
 const navItems: { key: PageKey; label: string }[] = [
   { key: "profile", label: "个人背景" },
   { key: "planning", label: "院校规划" },
   { key: "knowledge", label: "资料问答" },
   { key: "materials", label: "材料与面试" },
+  { key: "workflows", label: "\u6267\u884c\u8bb0\u5f55" },
 ];
 
 const pageDescriptions: Record<PageKey, string> = {
@@ -30,6 +32,7 @@ const pageDescriptions: Record<PageKey, string> = {
   planning: "根据你的画像生成冲刺、稳妥、保底院校建议和准备节奏。",
   knowledge: "上传院校通知、导师主页和经验贴，快速查询材料要求和方向信息。",
   materials: "生成联系邮件和模拟面试题，帮助你更快进入准备状态。",
+  workflows: "\u67e5\u770b Planner\u3001MCP \u5de5\u5177\u3001Agent\u3001\u6a21\u578b\u8def\u7531\u548c Critic \u91cd\u5199\u7684\u5b8c\u6574\u6267\u884c\u8f68\u8ff9\u3002",
 };
 
 function App() {
@@ -240,6 +243,10 @@ function App() {
     pushWorkflow(result.workflow);
   }
 
+  async function refreshWorkflows() {
+    setWorkflows(await api.getWorkflows());
+  }
+
   return (
     <div className="siteShell">
       <header className="heroStage">
@@ -372,6 +379,9 @@ function App() {
             onStatement={generateStatement}
             onInterview={generateInterview}
           />
+        )}
+        {page === "workflows" && (
+          <WorkflowPage workflows={workflows} onRefresh={refreshWorkflows} />
         )}
       </main>
     </div>

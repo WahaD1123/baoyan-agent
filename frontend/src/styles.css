@@ -1372,3 +1372,238 @@ summary {
     display: none;
   }
 }
+
+/* Workflow middleware trace */
+.workflowTrace {
+  display: grid;
+  gap: 12px;
+}
+
+.workflowRunMeta {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.workflowRunMeta small {
+  color: #74786e;
+  font-weight: 700;
+}
+
+.planSource,
+.traceKind,
+.traceStatus {
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1;
+  padding: 5px 7px;
+}
+
+.planSource {
+  background: #e8f1d1;
+  color: #354324;
+}
+
+.planSource[data-source="fallback"] {
+  background: #fff0ce;
+  color: #714d08;
+}
+
+.plannerSummary {
+  color: #5d6258;
+  font-size: 13px;
+  margin: 0;
+}
+
+.traceList {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+}
+
+.workflowItem .traceStep {
+  border-bottom: 1px solid #e1ded3;
+  border-left: 3px solid #9fc345;
+  margin: 0;
+  padding: 12px 0 12px 14px;
+}
+
+.workflowItem .traceStep:last-child {
+  border-bottom: 0;
+}
+
+.workflowItem .traceStep.trace-skipped {
+  border-left-color: #c99a35;
+  opacity: 0.78;
+}
+
+.workflowItem .traceStep.trace-failed {
+  border-left-color: #a6473d;
+}
+
+.traceStepHeader {
+  align-items: flex-start;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
+}
+
+.traceKind {
+  background: #e8f1d1;
+  color: #354324;
+  text-align: center;
+}
+
+.traceKind[data-kind="tool"] {
+  background: #dcecf0;
+  color: #24505d;
+}
+
+.traceKind[data-kind="condition"] {
+  background: #fff0ce;
+  color: #714d08;
+}
+
+.traceIdentity {
+  min-width: 0;
+}
+
+.traceIdentity strong,
+.traceIdentity small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.traceIdentity strong {
+  color: #242821;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 13px;
+}
+
+.traceIdentity small {
+  color: #74786e;
+  margin-top: 4px;
+}
+
+.traceStatus {
+  background: #edf0e7;
+  color: #4d5545;
+  white-space: nowrap;
+}
+
+.traceStatus[data-status="skipped"] {
+  background: #fff0ce;
+  color: #714d08;
+}
+
+.traceStatus[data-status="failed"] {
+  background: #f7dfdc;
+  color: #7a2f28;
+}
+
+.traceFacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 8px 0 0 64px;
+}
+
+.traceFacts span {
+  color: #555b50;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 11px;
+}
+
+.traceReason,
+.traceError,
+.traceFallback {
+  font-size: 12px;
+  margin: 8px 0 0 64px;
+}
+
+.traceReason {
+  color: #555b50;
+}
+
+.traceError,
+.traceFallback {
+  color: #8b352d;
+}
+
+.toolTraceDetails {
+  margin-left: 64px;
+}
+
+.toolTraceDetails summary,
+.workflowOutput summary {
+  font-size: 12px;
+  padding: 5px 0;
+}
+
+.toolTraceDetails dl {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 0;
+}
+
+.toolTraceDetails dl > div {
+  display: grid;
+  gap: 3px;
+}
+
+.toolTraceDetails dt {
+  color: #74786e;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.toolTraceDetails dd {
+  margin: 0;
+  min-width: 0;
+}
+
+.toolTraceDetails code {
+  background: #f0efe7;
+  border-radius: 4px;
+  color: #2f4b1a;
+  display: block;
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 11px;
+  max-height: 120px;
+  overflow: auto;
+  padding: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.workflowOutput {
+  border-top: 1px solid #d8d6cb;
+  margin-top: 2px;
+  padding-top: 4px;
+}
+
+.workflowOutput .markdownBody {
+  min-height: 0;
+  padding-top: 8px;
+}
+
+@media (max-width: 640px) {
+  .traceStepHeader {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+
+  .traceStatus {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .traceFacts,
+  .traceReason,
+  .traceError,
+  .traceFallback,
+  .toolTraceDetails {
+    margin-left: 58px;
+  }
+}

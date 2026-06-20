@@ -77,3 +77,27 @@ Base URL: `http://127.0.0.1:8000`
   - Lists workflow records, newest first.
 - `GET /api/workflows/{workflow_id}`
   - Returns a single workflow record.
+
+## Member C Dynamic Workflow
+
+The existing material and interview request/response contracts are unchanged. Their returned `workflow` now includes:
+
+- `plan_source`: `planner`, `fallback`, or legacy `fixed`.
+- `planner_summary`: validation or fallback explanation.
+- `steps[].step_type`: `planner`, `tool`, `agent`, or `condition`.
+- `steps[].capability`: the allow-listed capability name.
+- `steps[].model_name`: the routed model for Planner, generation, or Critic.
+- `steps[].duration_ms`: measured execution time.
+- `steps[].tool_call`: MCP transport, arguments summary, result summary, duration, and fallback reason.
+- `steps[].decision_reason`: Planner rationale, Critic decision, or conditional skip reason.
+
+Member C MCP endpoint: `http://127.0.0.1:8002/mcp`.
+
+Registered MCP tools:
+
+- `profile.build_context`
+- `advisor.get_context`
+- `knowledge.search`
+- `interview.retrieve_evidence`
+
+The MCP server is a separate Streamable HTTP process. The FastAPI service is the MCP client; the browser never calls port 8002 directly.

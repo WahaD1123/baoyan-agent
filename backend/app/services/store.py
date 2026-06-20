@@ -100,6 +100,10 @@ class JsonStore:
         documents = [Document.model_validate(record) for record in records]
         return [prepare_document(document) if not document.chunks else document for document in documents]
 
+    def refresh_documents(self) -> list[Document]:
+        self.documents = self._load_documents()
+        return self.documents
+
     def _load_advisors(self) -> list[Advisor]:
         records = self._read_json(
             self.advisors_path,

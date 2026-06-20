@@ -89,10 +89,36 @@ class AgentResult(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
+class CriticDecision(BaseModel):
+    passed: bool
+    score: int = Field(ge=0, le=100)
+    summary: str
+    issues: list[str] = Field(default_factory=list, max_length=3)
+    suggestions: list[str] = Field(default_factory=list, max_length=3)
+
+
+class ToolCallTrace(BaseModel):
+    tool_name: str
+    transport: Literal["mcp", "local_fallback"] = "mcp"
+    arguments_summary: str = ""
+    result_summary: str = ""
+    duration_ms: int = Field(default=0, ge=0)
+    fallback_reason: str = ""
+
+
 class WorkflowStep(BaseModel):
     name: str
-    status: Literal["pending", "running", "completed", "failed"] = "completed"
+    status: Literal["pending", "running", "completed", "failed", "skipped"] = "completed"
     agent_result: AgentResult | None = None
+    step_type: Literal["planner", "tool", "agent", "condition"] = "agent"
+    capability: str = ""
+    decision_reason: str = ""
+    model_name: str = ""
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    duration_ms: int = Field(default=0, ge=0)
+    tool_call: ToolCallTrace | None = None
+    error: str = ""
 
 
 class WorkflowRun(BaseModel):
@@ -101,6 +127,8 @@ class WorkflowRun(BaseModel):
     status: Literal["pending", "running", "completed", "failed"] = "completed"
     steps: list[WorkflowStep] = Field(default_factory=list)
     final_result: str = ""
+    plan_source: Literal["fixed", "planner", "fallback"] = "fixed"
+    planner_summary: str = ""
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 

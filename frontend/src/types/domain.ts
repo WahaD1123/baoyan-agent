@@ -79,10 +79,26 @@ export type AgentResult = {
   created_at: string;
 };
 
+export type ToolCallTrace = {
+  tool_name: string;
+  transport: "mcp" | "local_fallback";
+  arguments_summary: string;
+  result_summary: string;
+  duration_ms: number;
+  fallback_reason?: string;
+};
+
 export type WorkflowStep = {
   name: string;
   status: string;
   agent_result?: AgentResult;
+  step_type?: "planner" | "tool" | "agent" | "condition";
+  capability?: string;
+  decision_reason?: string;
+  model_name?: string;
+  duration_ms?: number;
+  tool_call?: ToolCallTrace | null;
+  error?: string;
 };
 
 export type WorkflowRun = {
@@ -92,6 +108,8 @@ export type WorkflowRun = {
   steps: WorkflowStep[];
   final_result: string;
   created_at: string;
+  plan_source?: "fixed" | "planner" | "fallback";
+  planner_summary?: string;
 };
 
 export type ProfileAnalysis = {

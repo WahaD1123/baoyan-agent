@@ -20,9 +20,9 @@ class MockLLMProvider:
                 {
                     "passed": False,
                     "score": 72,
-                    "summary": "The deterministic demo critic requests one grounded revision.",
-                    "issues": ["Verify every claim against collected evidence."],
-                    "suggestions": ["Keep only facts present in the tool context."],
+                    "summary": "演示模式的质量检查建议进行一次有依据的修改。",
+                    "issues": ["部分表述需要进一步核对证据来源。"],
+                    "suggestions": ["仅保留工具上下文中能够验证的事实。"],
                 }
             )
         if task == "profile":
@@ -207,8 +207,8 @@ class DashScopeProvider:
             "extract": "你是信息抽取助手。请用清晰中文总结，并尽量保留关键字段。",
             "critic": "你是审查助手。检查输出是否具体、是否有依据、是否有编造风险。",
             "critic_structured": (
-                "You are a strict application-material reviewer. Return JSON only with "
-                "passed, score, summary, issues, and suggestions fields."
+                "你是严格的保研申请材料质量检查员。只返回包含 passed、score、summary、"
+                "issues 和 suggestions 字段的 JSON；除字段名外，所有文字内容必须使用简体中文。"
             ),
             "workflow_planner": "你是受约束的工作流规划智能体。只能输出符合给定 schema 的 JSON，并且只能选择能力清单中的名称。",
             "school": "你是保研院校规划助手。请基于学生画像和检索证据，给出简短而明确的院校建议。",

@@ -112,3 +112,24 @@ def test_executor_skips_conditional_revision_when_critic_passes() -> None:
     assert "Critic passed" in revision.decision_reason
     assert "first draft email" in workflow.final_result
     assert sum(task == "material" for task, _prompt in llm.calls) == 1
+
+
+def test_critic_requests_chinese_and_formats_readable_markdown() -> None:
+    llm = ScriptedLLM(critic_passed=False)
+
+    result, decision = CriticAgent(llm=llm).review_member_c(
+        content="draft",
+        goal="generate_advisor_email",
+        evidence_summary="grounded evidence",
+    )
+
+    critic_prompt = next(prompt for task, prompt in llm.calls if task == "critic_structured")
+    assert "简体中文" in critic_prompt
+    assert decision.passed is False
+    assert result.output == (
+        "**审查结论：** 需要修改\n\n"
+        "**评分：** 62 / 100\n\n"
+        "### 总结\n\nrevision required\n\n"
+        "### 主要问题\n\n1. one unsupported phrase\n\n"
+        "### 修改建议\n\n1. remove the phrase"
+    )

@@ -1,11 +1,14 @@
 import { Section } from "../components/Section";
 import { MarkdownContent } from "../components/MarkdownContent";
 
+export type MaterialGeneration = "email" | "resume" | "statement" | "interview";
+
 type Props = {
   email: string;
   resumeHighlights: string;
   statement: string;
   interview: string;
+  generating: MaterialGeneration | null;
   onEmail: () => void;
   onResumeHighlights: () => void;
   onStatement: () => void;
@@ -17,11 +20,14 @@ export function MaterialsPage({
   resumeHighlights,
   statement,
   interview,
+  generating,
   onEmail,
   onResumeHighlights,
   onStatement,
   onInterview
 }: Props) {
+  const busy = generating !== null;
+
   return (
     <Section
       title="材料与面试"
@@ -29,10 +35,33 @@ export function MaterialsPage({
       description="基于个人画像和导师信息，生成可继续修改的申请材料与面试练习题。"
       actions={
         <>
-          <button onClick={onEmail}>生成导师邮件</button>
-          <button className="secondary" onClick={onResumeHighlights}>生成简历亮点</button>
-          <button className="secondary" onClick={onStatement}>生成个人陈述</button>
-          <button className="secondary" onClick={onInterview}>生成面试题</button>
+          <button aria-busy={generating === "email"} disabled={busy} onClick={onEmail}>
+            {generating === "email" ? "生成中..." : "生成导师邮件"}
+          </button>
+          <button
+            aria-busy={generating === "resume"}
+            className="secondary"
+            disabled={busy}
+            onClick={onResumeHighlights}
+          >
+            {generating === "resume" ? "生成中..." : "生成简历亮点"}
+          </button>
+          <button
+            aria-busy={generating === "statement"}
+            className="secondary"
+            disabled={busy}
+            onClick={onStatement}
+          >
+            {generating === "statement" ? "生成中..." : "生成个人陈述"}
+          </button>
+          <button
+            aria-busy={generating === "interview"}
+            className="secondary"
+            disabled={busy}
+            onClick={onInterview}
+          >
+            {generating === "interview" ? "生成中..." : "生成面试题"}
+          </button>
         </>
       }
     >

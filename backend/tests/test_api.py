@@ -281,7 +281,10 @@ def test_member_c_dynamic_steps_keep_generation_bounds() -> None:
             if step["capability"] == "critic.review"
         )
         assert generation_rule in generation["agent_result"]["input_summary"]
-        assert "Return one JSON object only" in critic["agent_result"]["input_summary"]
+        critic_prompt = critic["agent_result"]["input_summary"]
+        assert "JSON" in critic_prompt
+        assert "passed" in critic_prompt
+        assert "简体中文" in critic_prompt
         assert workflow["plan_source"] in {"planner", "fallback"}
         assert generation["model_name"]
         assert critic["model_name"]

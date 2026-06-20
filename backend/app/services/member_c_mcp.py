@@ -8,8 +8,6 @@ from time import perf_counter
 from typing import Any, Literal
 
 import httpx
-from mcp import ClientSession
-from mcp.client.streamable_http import streamable_http_client
 
 from app.core.config import get_settings
 from app.tools.member_c_tools import dispatch_local_tool, member_c_tool_names
@@ -74,6 +72,12 @@ class MemberCMCPClient:
         raise RuntimeError("MemberCMCPClient.call_tool must run outside an active event loop")
 
     async def _call_remote_async(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        try:
+            from mcp import ClientSession
+            from mcp.client.streamable_http import streamable_http_client
+        except ModuleNotFoundError as exc:
+            raise RuntimeError("MCP client dependencies are not installed. Run pip install -r requirements.txt") from exc
+
         timeout = httpx.Timeout(self.timeout_seconds)
         async with httpx.AsyncClient(timeout=timeout) as http_client:
             async with streamable_http_client(

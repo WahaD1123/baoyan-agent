@@ -1,6 +1,6 @@
 import json
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from time import perf_counter
 from typing import Any
 
@@ -20,6 +20,8 @@ from app.services.store import store
 from app.workflows.capabilities import build_member_c_registry
 from app.workflows.planner import TaskPlanner
 from app.workflows.planning import PlanStep
+
+UTC = timezone.utc
 
 
 @dataclass(frozen=True)

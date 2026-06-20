@@ -42,11 +42,6 @@ mcp = FastMCP(
 )
 
 
-@mcp.tool(name="profile.build_context", structured_output=True)
-def profile_build_context(profile: dict[str, Any]) -> dict[str, Any]:
-    return build_profile_context(profile)
-
-
 @mcp.tool(name="knowledge.add_text", structured_output=True)
 def mcp_knowledge_add_text(
     title: str,
@@ -85,6 +80,11 @@ def mcp_advisor_list(limit: int = 20) -> dict[str, Any]:
 @mcp.tool(name="advisor.match", structured_output=True)
 def mcp_advisor_match(profile: dict[str, Any], top_k: int = 3) -> dict[str, Any]:
     return advisor_match(profile=profile, top_k=top_k)
+
+
+@mcp.tool(name="profile.build_context", structured_output=True)
+def profile_build_context(profile: dict[str, Any]) -> dict[str, Any]:
+    return build_profile_context(profile)
 
 
 @mcp.tool(name="planning.profile_analyze", structured_output=True)

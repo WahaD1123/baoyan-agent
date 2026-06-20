@@ -113,7 +113,7 @@ class JsonStore:
     def _load_advisors(self) -> list[Advisor]:
         records = self._read_json(
             self.advisors_path,
-            [advisor.model_dump(mode="json") for advisor in self._sample_advisors()] if self.settings.load_sample_data else [],
+            [advisor.model_dump(mode="json") for advisor in self._sample_advisors()],
         )
         return [Advisor.model_validate(record) for record in records]
 

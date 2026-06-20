@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api } from "./api/client";
-import { sampleAdvisors, sampleDocuments, sampleProfile } from "./api/mockData";
+import { sampleAdvisors, sampleProfile } from "./api/mockData";
 import { KnowledgePage } from "./pages/KnowledgePage";
 import { MaterialsPage } from "./pages/MaterialsPage";
 import { PlanningPage } from "./pages/PlanningPage";
@@ -39,7 +39,7 @@ function App() {
   const [page, setPage] = useState<PageKey>("profile");
   const [profile, setProfile] = useState<StudentProfile>(sampleProfile);
   const [analysis, setAnalysis] = useState<ProfileAnalysis | null>(null);
-  const [documents, setDocuments] = useState<DocumentItem[]>(sampleDocuments);
+  const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [advisors, setAdvisors] = useState<Advisor[]>(sampleAdvisors);
   const [workflows, setWorkflows] = useState<WorkflowRun[]>([]);
   const [chunks, setChunks] = useState<RetrievedChunk[]>([]);
@@ -101,7 +101,6 @@ function App() {
       const result = await api.analyzeProfile(nextProfile);
       setAnalysis(result);
       setProfile(nextProfile);
-      setPage("planning");
     } finally {
       setAnalyzingProfile(false);
     }
@@ -117,6 +116,7 @@ function App() {
       setTimeline(result.timeline);
       setPlanningEvidence(result.evidence);
       pushWorkflow(result.workflow);
+      setPage("planning");
     } finally {
       setPlanning(false);
     }

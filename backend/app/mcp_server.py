@@ -3,6 +3,21 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from app.core.config import get_settings
+from app.tools.member_a_tools import (
+    planning_build_timeline,
+    planning_profile_analyze,
+    planning_recommend_schools,
+    planning_retrieve_evidence,
+)
+from app.tools.member_b_tools import (
+    advisor_add_url,
+    advisor_list,
+    advisor_match,
+    knowledge_add_text,
+    knowledge_add_url,
+    knowledge_list_documents,
+    knowledge_query,
+)
 from app.tools.member_c_tools import (
     build_advisor_context,
     build_profile_context,
@@ -13,8 +28,12 @@ from app.tools.member_c_tools import (
 
 settings = get_settings()
 mcp = FastMCP(
-    name="baoyan-member-c-tools",
-    instructions="Grounded profile, advisor, knowledge, and interview tools for Member C workflows.",
+    name="baoyan-agent-tools",
+    instructions=(
+        "Unified Baoyan Agent MCP tools. Member A exposes planning and school recommendation tools. "
+        "Member B exposes knowledge-base ingestion, RAG QA, advisor crawling, and advisor matching. "
+        "Member C exposes grounded profile, advisor, knowledge, and interview helpers."
+    ),
     host=settings.mcp_server_host,
     port=settings.mcp_server_port,
     streamable_http_path="/mcp",
@@ -26,6 +45,66 @@ mcp = FastMCP(
 @mcp.tool(name="profile.build_context", structured_output=True)
 def profile_build_context(profile: dict[str, Any]) -> dict[str, Any]:
     return build_profile_context(profile)
+
+
+@mcp.tool(name="knowledge.add_text", structured_output=True)
+def mcp_knowledge_add_text(
+    title: str,
+    content: str,
+    doc_type: str = "other",
+    source: str = "mcp_text",
+) -> dict[str, Any]:
+    return knowledge_add_text(title=title, content=content, doc_type=doc_type, source=source)  # type: ignore[arg-type]
+
+
+@mcp.tool(name="knowledge.add_url", structured_output=True)
+def mcp_knowledge_add_url(url: str, doc_type: str = "notice", title: str = "") -> dict[str, Any]:
+    return knowledge_add_url(url=url, doc_type=doc_type, title=title)  # type: ignore[arg-type]
+
+
+@mcp.tool(name="knowledge.query", structured_output=True)
+def mcp_knowledge_query(question: str, top_k: int = 3) -> dict[str, Any]:
+    return knowledge_query(question=question, top_k=top_k)
+
+
+@mcp.tool(name="knowledge.list_documents", structured_output=True)
+def mcp_knowledge_list_documents(limit: int = 20, include_content: bool = False) -> dict[str, Any]:
+    return knowledge_list_documents(limit=limit, include_content=include_content)
+
+
+@mcp.tool(name="advisor.add_url", structured_output=True)
+def mcp_advisor_add_url(url: str, title: str = "") -> dict[str, Any]:
+    return advisor_add_url(url=url, title=title)
+
+
+@mcp.tool(name="advisor.list", structured_output=True)
+def mcp_advisor_list(limit: int = 20) -> dict[str, Any]:
+    return advisor_list(limit=limit)
+
+
+@mcp.tool(name="advisor.match", structured_output=True)
+def mcp_advisor_match(profile: dict[str, Any], top_k: int = 3) -> dict[str, Any]:
+    return advisor_match(profile=profile, top_k=top_k)
+
+
+@mcp.tool(name="planning.profile_analyze", structured_output=True)
+def planning_analyze(profile: dict[str, Any]) -> dict[str, Any]:
+    return planning_profile_analyze(profile)
+
+
+@mcp.tool(name="planning.retrieve_evidence", structured_output=True)
+def planning_evidence(profile: dict[str, Any], top_k: int = 5) -> dict[str, Any]:
+    return planning_retrieve_evidence(profile, top_k)
+
+
+@mcp.tool(name="planning.recommend_schools", structured_output=True)
+def planning_recommend(profile: dict[str, Any], top_k: int = 3) -> dict[str, Any]:
+    return planning_recommend_schools(profile, top_k)
+
+
+@mcp.tool(name="planning.build_timeline", structured_output=True)
+def planning_timeline(profile: dict[str, Any]) -> dict[str, Any]:
+    return planning_build_timeline(profile)
 
 
 @mcp.tool(name="advisor.get_context", structured_output=True)

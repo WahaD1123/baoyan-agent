@@ -37,9 +37,11 @@ app.include_router(workflows.router, prefix="/api/workflows", tags=["workflows"]
 @app.on_event("startup")
 def log_startup_settings() -> None:
     logger.info(
-        "App startup: provider=%s model=%s has_api_key=%s loaded_env_files=%s",
+        "App startup: provider=%s model=%s has_api_key=%s agent_sdk_enabled=%s agent_sdk_model=%s loaded_env_files=%s",
         settings.llm_provider,
         settings.llm_model,
         bool(settings.llm_api_key),
+        settings.agent_sdk_enabled,
+        settings.agent_sdk_model,
         settings.loaded_env_files or ["none"],
     )

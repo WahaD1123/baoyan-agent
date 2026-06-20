@@ -2,20 +2,26 @@ import json
 from pathlib import Path
 from typing import Any
 
+from app.core.config import get_settings
 from app.models import Advisor, Document, StudentProfile, WorkflowRun
 
 
 class JsonStore:
     def __init__(self) -> None:
         self.store_dir = Path(__file__).resolve().parents[3] / "data" / "store"
+        self.seed_dir = Path(__file__).resolve().parents[3] / "data" / "seed"
         self.store_dir.mkdir(parents=True, exist_ok=True)
+        self.seed_dir.mkdir(parents=True, exist_ok=True)
         self.documents_path = self.store_dir / "documents.json"
+        self.seed_documents_path = self.seed_dir / "boardcaster_documents.json"
         self.advisors_path = self.store_dir / "advisors.json"
         self.workflows_path = self.store_dir / "workflows.json"
+        self.settings = get_settings()
         self.profile = self._sample_profile()
         self.documents = self._load_documents()
         self.advisors = self._load_advisors()
         self.workflows = self._load_workflows()
+        self.purge_demo_content(save=True)
 
     def _sample_profile(self) -> StudentProfile:
         return StudentProfile(
@@ -93,10 +99,10 @@ class JsonStore:
     def _load_documents(self) -> list[Document]:
         from app.tools.document_processing import prepare_document
 
-        records = self._read_json(
-            self.documents_path,
-            [doc.model_dump(mode="json") for doc in self._sample_documents()],
-        )
+        default_records = self._seed_documents()
+        if not default_records and self.settings.load_sample_data:
+            default_records = [doc.model_dump(mode="json") for doc in self._sample_documents()]
+        records = self._read_json(self.documents_path, default_records)
         documents = [Document.model_validate(record) for record in records]
         return [prepare_document(document) if not document.chunks else document for document in documents]
 
@@ -107,7 +113,7 @@ class JsonStore:
     def _load_advisors(self) -> list[Advisor]:
         records = self._read_json(
             self.advisors_path,
-            [advisor.model_dump(mode="json") for advisor in self._sample_advisors()],
+            [advisor.model_dump(mode="json") for advisor in self._sample_advisors()] if self.settings.load_sample_data else [],
         )
         return [Advisor.model_validate(record) for record in records]
 
@@ -141,6 +147,33 @@ class JsonStore:
         self.workflows.insert(0, workflow)
         self.save_workflows()
         return workflow
+
+    def replace_documents(self, documents: list[Document]) -> list[Document]:
+        self.documents = documents
+        self.save_documents()
+        return self.documents
+
+    def purge_demo_content(self, save: bool = False) -> int:
+        before = len(self.documents)
+        self.documents = [document for document in self.documents if not _is_demo_document(document)]
+        removed = before - len(self.documents)
+        if removed and save:
+            self.save_documents()
+        return removed
+
+    def _seed_documents(self) -> list[dict[str, Any]]:
+        return self._read_json(self.seed_documents_path, [])
+
+
+def _is_demo_document(document: Document) -> bool:
+    title = document.title.strip().lower()
+    source = document.source.strip().lower()
+    return (
+        document.source_type == "sample"
+        or source in {"sample", "test"}
+        or title.startswith("test ")
+        or "summer camp notice" in title and source == "sample"
+    )
 
 
 store = JsonStore()

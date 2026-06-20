@@ -8,14 +8,7 @@ import type {
   StudentProfile,
   WorkflowRun,
 } from "../types/domain";
-import {
-  sampleAdvisors,
-  sampleDocuments,
-  sampleProfile,
-  sampleProfileAnalysis,
-  sampleRecommendations,
-  sampleWorkflow,
-} from "./mockData";
+import { sampleAdvisors, sampleDocuments, sampleProfile, sampleWorkflow } from "./mockData";
 
 const jsonHeaders = { "Content-Type": "application/json" };
 
@@ -51,10 +44,9 @@ export const api = {
   analyzeProfile: (profile: StudentProfile) =>
     request<ProfileAnalysis>(
       "/api/profile/analyze",
-      { method: "POST", headers: jsonHeaders, body: JSON.stringify(profile) },
-      sampleProfileAnalysis
+      { method: "POST", headers: jsonHeaders, body: JSON.stringify(profile) }
     ),
-  getDocuments: () => request<DocumentItem[]>("/api/knowledge/documents", undefined, sampleDocuments),
+  getDocuments: () => request<DocumentItem[]>("/api/knowledge/documents"),
   addDocument: (payload: Pick<DocumentItem, "title" | "doc_type" | "content" | "source">) =>
     request<DocumentItem>(
       "/api/knowledge/documents",
@@ -110,13 +102,7 @@ export const api = {
   askKnowledge: (question: string) =>
     request<{ answer: string; documents: DocumentItem[]; chunks: RetrievedChunk[]; workflow: WorkflowRun }>(
       "/api/knowledge/query",
-      { method: "POST", headers: jsonHeaders, body: JSON.stringify({ question }) },
-      {
-        answer: "演示模式下请先添加资料，系统会根据资料内容给出回答并列出证据片段。",
-        documents: sampleDocuments,
-        chunks: [],
-        workflow: sampleWorkflow,
-      }
+      { method: "POST", headers: jsonHeaders, body: JSON.stringify({ question }) }
     ),
   getAdvisors: () => request<Advisor[]>("/api/knowledge/advisors", undefined, sampleAdvisors),
   addAdvisorUrl: (url: string, title?: string) =>
@@ -156,15 +142,7 @@ export const api = {
       workflow: WorkflowRun;
     }>(
       "/api/planning/generate",
-      { method: "POST", headers: jsonHeaders, body: JSON.stringify({ profile }) },
-      {
-        plan: "示例规划：优先冲刺上海交通大学，稳妥关注浙江大学，并准备保底选项。",
-        analysis: sampleProfileAnalysis,
-        recommendations: sampleRecommendations,
-        timeline: ["第 1 周：整理材料", "第 2 周：联系导师", "第 3 周：模拟面试"],
-        evidence: ["上海交通大学计算机夏令营通知"],
-        workflow: sampleWorkflow,
-      }
+      { method: "POST", headers: jsonHeaders, body: JSON.stringify({ profile }) }
     ),
   generateEmail: (profile: StudentProfile, advisor?: Advisor) =>
     request<{ content: string; workflow: WorkflowRun }>(

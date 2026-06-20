@@ -12,6 +12,7 @@ from app.models import (
     KnowledgeResponse,
     UrlDocumentRequest,
 )
+from app.services.boardcaster_service import import_boardcaster_documents
 from app.services.library_router import route_chunks_for_documents, route_documents_by_library
 from app.services.store import store
 from app.tools.document_processing import extract_text_from_pdf, prepare_document
@@ -50,6 +51,34 @@ def add_text_document(payload: DocumentCreate) -> dict[str, object]:
     workflow = run_ingest_workflow(document, "text")
     store.add_workflow(workflow)
     return {"document": document, "workflow": workflow}
+
+
+@router.post("/documents/cleanup-demo", response_model=dict)
+def cleanup_demo_documents() -> dict[str, object]:
+    removed = store.purge_demo_content(save=True)
+    return {"removed": removed, "remaining": len(store.documents)}
+
+
+@router.post("/documents/import/boardcaster", response_model=dict)
+def import_boardcaster(payload: dict[str, object] | None = None) -> dict[str, object]:
+    body = payload or {}
+    years = [str(item) for item in body.get("years", []) if str(item).strip()] or None
+    max_items = int(body.get("max_items", 160))
+    only_cs_related = bool(body.get("only_cs_related", True))
+    result = import_boardcaster_documents(
+        store.documents,
+        years=years,
+        max_items=max_items,
+        only_cs_related=only_cs_related,
+    )
+    for document in result.imported:
+        store.add_document(document)
+    return {
+        "imported": len(result.imported),
+        "skipped_duplicates": result.skipped_duplicates,
+        "total_documents": len(store.documents),
+        "years": years or ["camp2026", "camp2025", "yutuimian2024"],
+    }
 
 
 @router.post("/documents/upload", response_model=dict)

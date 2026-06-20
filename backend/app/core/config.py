@@ -23,6 +23,9 @@ class Settings:
         self.llm_api_key = os.getenv("LLM_API_KEY", "") or os.getenv("DASHSCOPE_API_KEY", "")
         self.llm_base_url = os.getenv("LLM_BASE_URL", "")
         self.llm_model = os.getenv("LLM_MODEL", "qwen-vl-max")
+        self.agent_sdk_enabled = _env_bool("AGENT_SDK_ENABLED", True)
+        self.agent_sdk_model = os.getenv("AGENT_SDK_MODEL", self.llm_model)
+        self.agent_sdk_timeout_seconds = _env_float("AGENT_SDK_TIMEOUT_SECONDS", 30.0)
         self.llm_critic_model = os.getenv("LLM_CRITIC_MODEL", "qwen3.6-flash")
         self.llm_critic_max_tokens = _env_int("LLM_CRITIC_MAX_TOKENS", 400)
         self.llm_planner_model = os.getenv("LLM_PLANNER_MODEL", "qwen3.6-flash")
@@ -34,6 +37,8 @@ class Settings:
         self.mcp_local_fallback = _env_bool("MCP_LOCAL_FALLBACK", True)
         self.llm_member_c_fallback_model = os.getenv("LLM_MEMBER_C_FALLBACK_MODEL", "qwen3.6-flash")
         self.llm_member_c_max_tokens = _env_int("LLM_MEMBER_C_MAX_TOKENS", 1200)
+        self.load_sample_data = _env_bool("LOAD_SAMPLE_DATA", False)
+        self.boardcaster_data_path = os.getenv("BOARDCASTER_DATA_PATH", "")
         self.loaded_env_files = list(dict.fromkeys(_loaded_env_files))
         self.expected_env_files = [str(root_env), str(backend_env)]
 

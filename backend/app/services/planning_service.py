@@ -1,11 +1,32 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
+import logging
+import re
 from typing import Any, Iterable
 
 from app.models import Document, ProfileAnalysis, RetrievedChunk, SchoolRecommendation, StudentProfile
 from app.services.llm import get_llm_provider
 from app.tools.retrieval import hybrid_retrieve
+
+logger = logging.getLogger("baoyan-agent.planning")
+
+SCHOOL_DISPLAY_MAP = {
+    "tsinghua university": "清华大学",
+    "peking university": "北京大学",
+    "beijing university": "北京大学",
+    "shanghai jiao tong university": "上海交通大学",
+    "fudan university": "复旦大学",
+    "zhejiang university": "浙江大学",
+    "nanjing university": "南京大学",
+    "university of science and technology of china": "中国科学技术大学",
+    "beihang university": "北京航空航天大学",
+    "harbin institute of technology": "哈尔滨工业大学",
+    "southeast university": "东南大学",
+    "sun yat-sen university": "中山大学",
+    "xiamen university": "厦门大学",
+}
 
 
 @dataclass(frozen=True)
@@ -28,9 +49,9 @@ class NoticeContext:
 
 
 BASE_CATALOG: tuple[SchoolCatalogItem, ...] = (
-    SchoolCatalogItem("Tsinghua University", ("tsinghua", "清华", "清华大学"), "beijing", ("ai", "systems", "theory"), 95, "CS Summer Camp"),
-    SchoolCatalogItem("Peking University", ("pku", "peking university", "北大", "北京大学"), "beijing", ("ai", "theory", "nlp"), 94, "Information Science Program"),
-    SchoolCatalogItem("Shanghai Jiao Tong University", ("sjtu", "shanghai jiao tong university", "上交", "上海交通大学"), "shanghai", ("ai", "machine learning", "systems", "agent", "retrieval"), 91, "CS Summer Camp"),
+    SchoolCatalogItem("Tsinghua University", ("tsinghua", "清华", "清华大学"), "beijing", ("ai", "systems", "theory"), 98, "CS Summer Camp"),
+    SchoolCatalogItem("Peking University", ("pku", "peking university", "北大", "北京大学"), "beijing", ("ai", "theory", "nlp"), 97, "Information Science Program"),
+    SchoolCatalogItem("Shanghai Jiao Tong University", ("sjtu", "shanghai jiao tong university", "上交", "上海交通大学"), "shanghai", ("ai", "machine learning", "systems", "agent", "retrieval"), 93, "CS Summer Camp"),
     SchoolCatalogItem("Fudan University", ("fudan", "复旦", "复旦大学"), "shanghai", ("ai", "nlp", "data"), 90, "Computer Science Program"),
     SchoolCatalogItem("Zhejiang University", ("zju", "浙江大学", "浙大"), "hangzhou", ("ai", "machine learning", "retrieval", "systems"), 88, "Computer Science Program"),
     SchoolCatalogItem("Nanjing University", ("nju", "南京大学", "南大"), "nanjing", ("ai", "software engineering", "systems"), 87, "Computer Science Program"),
@@ -95,7 +116,7 @@ def analyze_profile(profile: StudentProfile) -> ProfileAnalysis:
         ]
     )
 
-    return ProfileAnalysis(
+    heuristic = ProfileAnalysis(
         overall_score=overall_score,
         academic_score=academic_score,
         research_score=research_score,
@@ -110,6 +131,7 @@ def analyze_profile(profile: StudentProfile) -> ProfileAnalysis:
             "系统会结合你的背景、院校偏好和已导入通知，生成更有依据的规划结果。"
         ),
     )
+    return _enrich_profile_analysis(profile, heuristic)
 
 
 def retrieve_planning_evidence(profile: StudentProfile, documents: list[Document], top_k: int = 6) -> list[RetrievedChunk]:
@@ -205,13 +227,32 @@ def format_plan_summary(
     evidence_titles: list[str] | None = None,
 ) -> str:
     llm = get_llm_provider()
-    rec_lines = [f"{item.school_name}（{_level_label(item.level)}，匹配度 {item.match_score}）" for item in recommendations]
+    rec_lines = [
+        (
+            f"{item.school_name} / {_level_label(item.level)} / 匹配度{item.match_score} / "
+            f"理由:{'；'.join(item.reasons[:2]) or '暂无'} / "
+            f"风险:{'；'.join(item.risks[:2]) or '暂无'}"
+        )
+        for item in recommendations
+    ]
+    strength_text = "；".join(analysis.strengths[:2]) or "暂无"
+    weakness_text = "；".join(analysis.weaknesses[:2]) or "暂无明显短板"
+    next_actions = "；".join(timeline[:2]) or "尽快整理材料并确认目标院校"
     prompt = (
-        f"学生：{profile.name}，综合分 {analysis.overall_score}。\n"
-        f"推荐院校：{'；'.join(rec_lines)}。\n"
-        f"时间线：{'；'.join(timeline)}。\n"
-        f"参考资料：{'；'.join(evidence_titles or []) or '暂无'}。\n"
-        "请用 2 到 3 句中文写一段规划摘要，语气专业、具体，不要解释系统过程。"
+        "你是保研规划顾问，请写一段真正个性化的中文规划摘要。\n"
+        "要求：\n"
+        "1. 必须点名学校，不要只说冲刺、稳妥、保底。\n"
+        "2. 必须结合学生优势和短板，不能写空泛套话。\n"
+        "3. 必须指出当前最应该先做的两件事。\n"
+        "4. 不要解释系统流程，不要出现“系统建议”“综合判断如下”这类模板表达。\n"
+        "5. 不得编造不存在的实验指标、论文、奖项、导师信息或截止日期。\n"
+        "6. 输出 3 到 5 句自然中文。\n"
+        f"学生：{profile.name}，综合分{analysis.overall_score}，学业分{analysis.academic_score}，科研分{analysis.research_score}。\n"
+        f"优势：{strength_text}。\n"
+        f"短板：{weakness_text}。\n"
+        f"院校结果：{' | '.join(rec_lines)}。\n"
+        f"接下来：{next_actions}。\n"
+        f"参考资料：{'；'.join(evidence_titles or []) or '暂无'}。"
     )
     return " ".join(llm.generate(prompt, task="planner").split())
 
@@ -283,6 +324,7 @@ def _score_candidate(
     difficulty_gap = analysis.overall_score - item.base_difficulty
 
     score = 64 + round((analysis.overall_score - 70) * 0.65)
+    score += round(difficulty_gap * 0.9)
     reasons: list[str] = []
     risks: list[str] = []
     todo: list[str] = [
@@ -339,8 +381,9 @@ def _score_candidate(
     return {
         "school_name": item.school_name,
         "program_name": item.program_name,
-        "score": max(60, min(95, score)),
+        "score": max(52, min(95, score)),
         "difficulty_gap": difficulty_gap,
+        "base_difficulty": item.base_difficulty,
         "reasons": _unique_keep_order(reasons) or ["整体背景与该校方向基本匹配。"],
         "risks": _unique_keep_order(risks),
         "todo": _unique_keep_order(todo),
@@ -392,9 +435,17 @@ def _pick_for_level(scored: list[dict[str, Any]], picked: list[dict[str, Any]], 
     }
     low, high = target_ranges[level]
     picked_names = {item["school_name"] for item in picked}
-    pool = [item for item in scored if item["school_name"] not in picked_names and low <= item["score"] <= high]
+    pool = [
+        item for item in scored
+        if item["school_name"] not in picked_names
+        and low <= item["score"] <= high
+        and _level_allowed(item, level, overall_score)
+    ]
     if not pool:
-        pool = [item for item in scored if item["school_name"] not in picked_names]
+        pool = [
+            item for item in scored
+            if item["school_name"] not in picked_names and _level_allowed(item, level, overall_score)
+        ]
     if not pool:
         return None
 
@@ -409,9 +460,18 @@ def _pick_for_level(scored: list[dict[str, Any]], picked: list[dict[str, Any]], 
     return chosen
 
 
+def _level_allowed(item: dict[str, Any], level: str, overall_score: int) -> bool:
+    base_difficulty = int(item.get("base_difficulty", 0))
+    if base_difficulty >= 96:
+        return level == "challenge"
+    if base_difficulty >= 93 and overall_score < 92:
+        return level != "safe"
+    return True
+
+
 def _to_recommendation(item: dict[str, Any]) -> SchoolRecommendation:
     return SchoolRecommendation(
-        school_name=item["school_name"],
+        school_name=_display_school_name(item["school_name"]),
         program_name=item["program_name"],
         level=item["level"],
         match_score=item["score"],
@@ -451,7 +511,7 @@ def _parse_agent_school_payload(response: str) -> dict[str, Any]:
 
 def _canonical_school_name(name: str) -> str:
     matched = _match_catalog_school(name)
-    return matched or name.strip()
+    return matched or _display_school_name(name.strip())
 
 
 def _match_catalog_school(text: str) -> str:
@@ -531,3 +591,133 @@ def _unique_keep_order(items: Iterable[str]) -> list[str]:
 
 def _level_label(level: str) -> str:
     return {"challenge": "冲刺", "stable": "稳妥", "safe": "保底"}.get(level, level)
+
+
+def _display_school_name(name: str) -> str:
+    text = name.strip()
+    return SCHOOL_DISPLAY_MAP.get(text.lower(), text)
+
+
+def _enrich_profile_analysis(profile: StudentProfile, heuristic: ProfileAnalysis) -> ProfileAnalysis:
+    llm = get_llm_provider()
+    prompt = (
+        "请基于给定学生背景，输出 JSON，字段必须为 strengths, weaknesses, suggestions, summary。\n"
+        "要求：\n"
+        "1. strengths/weaknesses/suggestions 都是中文数组，每个数组 2 到 4 条。\n"
+        "2. 必须结合学生真实字段，不要写空泛模板，不要编造论文、奖项、竞赛成绩、导师信息或截止时间。\n"
+        "3. summary 用 2 到 3 句中文，说明当前竞争力、主要短板和最优先动作。\n"
+        "4. 只输出 JSON。\n"
+        f"学生姓名：{profile.name}\n"
+        f"学校专业：{profile.university} / {profile.major}\n"
+        f"排名：前 {profile.rank_percent}%\n"
+        f"GPA：{profile.gpa}\n"
+        f"英语：{profile.english_score}\n"
+        f"研究兴趣：{', '.join(profile.research_interests) or '未填写'}\n"
+        f"项目经历：{'; '.join(profile.projects) or '未填写'}\n"
+        f"竞赛经历：{'; '.join(profile.competitions) or '未填写'}\n"
+        f"论文科研：{'; '.join(profile.publications) or '未填写'}\n"
+        f"目标地区：{', '.join(profile.target_regions) or '未填写'}\n"
+        f"偏好院校：{', '.join(profile.preferred_schools) or '未填写'}\n"
+        f"备注：{profile.notes or '无'}\n"
+        f"规则层优势：{'；'.join(heuristic.strengths) or '暂无'}\n"
+        f"规则层短板：{'；'.join(heuristic.weaknesses) or '暂无'}\n"
+        f"规则层建议：{'；'.join(heuristic.suggestions) or '暂无'}\n"
+    )
+    response = llm.generate(prompt, task="profile")
+    parsed = _parse_profile_payload(response)
+    if not parsed:
+        logger.info("Profile analysis fell back to heuristic output for profile=%s", profile.name)
+        return heuristic
+    parsed = _sanitize_profile_payload(parsed, profile, heuristic)
+    logger.info("Profile analysis enriched with LLM for profile=%s", profile.name)
+    return heuristic.model_copy(
+        update={
+            "strengths": parsed.get("strengths", heuristic.strengths),
+            "weaknesses": parsed.get("weaknesses", heuristic.weaknesses),
+            "suggestions": parsed.get("suggestions", heuristic.suggestions),
+            "summary": parsed.get("summary", heuristic.summary),
+        }
+    )
+
+
+def _parse_profile_payload(response: str) -> dict[str, Any]:
+    text = response.strip()
+    start = text.find("{")
+    end = text.rfind("}")
+    if start == -1 or end == -1 or end <= start:
+        return {}
+    try:
+        data = json.loads(text[start : end + 1])
+    except json.JSONDecodeError:
+        return {}
+
+    normalized: dict[str, Any] = {}
+    for key in ("strengths", "weaknesses", "suggestions"):
+        value = data.get(key)
+        if isinstance(value, list):
+            items = [str(item).strip() for item in value if str(item).strip()]
+            if items:
+                normalized[key] = items[:4]
+    summary = data.get("summary")
+    if isinstance(summary, str) and summary.strip():
+        normalized["summary"] = " ".join(summary.split())
+    return normalized
+
+
+def _sanitize_profile_payload(
+    payload: dict[str, Any],
+    profile: StudentProfile,
+    heuristic: ProfileAnalysis,
+) -> dict[str, Any]:
+    normalized = dict(payload)
+    for key, fallback in (
+        ("strengths", heuristic.strengths),
+        ("weaknesses", heuristic.weaknesses),
+        ("suggestions", heuristic.suggestions),
+    ):
+        values = payload.get(key, fallback)
+        if not isinstance(values, list):
+            values = fallback
+        cleaned = [
+            _repair_profile_text(text, profile)
+            for text in values
+            if _profile_item_consistent(str(text), profile)
+        ]
+        normalized[key] = cleaned[:4] or fallback
+    normalized["summary"] = _repair_profile_text(str(payload.get("summary") or heuristic.summary), profile)
+    return normalized
+
+
+def _repair_profile_text(text: str, profile: StudentProfile) -> str:
+    repaired = text.strip()
+    if not repaired:
+        return repaired
+    interests = "、".join(profile.research_interests[:3]) or "研究兴趣"
+    first_interest = profile.research_interests[0] if profile.research_interests else "目标方向"
+    regions = "、".join(profile.target_regions[:2]) or "目标地区"
+    repaired = re.sub(r"\?{2,}(?:,\s*\?{2,}){1,3}", interests, repaired)
+    repaired = re.sub(r"\?{2,}\s*数据集", f"{first_interest}相关数据集", repaired)
+    repaired = re.sub(r"\?{2,}\s*,\s*\?{2,}", regions, repaired)
+    repaired = re.sub(r"\?{2,}", first_interest, repaired)
+    replacements = {
+        "�": "",
+    }
+    for old, new in replacements.items():
+        repaired = repaired.replace(old, new)
+    return " ".join(repaired.split())
+
+
+def _profile_item_consistent(text: str, profile: StudentProfile) -> bool:
+    if profile.competitions and ("竞赛经历未填写" in text or "缺少竞赛" in text):
+        return False
+    if profile.publications and ("无论文" in text or "科研空白" in text):
+        return False
+    if not profile.publications and ("已有论文" in text or "论文经历丰富" in text):
+        return False
+    if profile.projects and ("缺少项目" in text or "项目经历不足" in text):
+        return False
+    if profile.english_score and "英语未填写" in text:
+        return False
+    if profile.preferred_schools and "偏好院校未填写" in text:
+        return False
+    return True

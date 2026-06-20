@@ -128,14 +128,21 @@ class MockLLMProvider:
         return json.dumps({"goal": goal, "steps": steps})
 
     def _profile_reply(self, prompt: str) -> str:
-        pieces = []
-        if "rank top" in prompt.lower() or "排名" in prompt:
-            pieces.append("画像分析显示该学生具备较好的学业基础。")
-        if "gpa" in prompt.lower():
-            pieces.append("绩点信息已经纳入竞争力评估。")
-        if "interests" in prompt.lower() or "方向" in prompt:
-            pieces.append("研究兴趣将作为后续选校和导师匹配的重要依据。")
-        return " ".join(pieces) or "画像分析已完成，系统将围绕学业、科研和项目背景生成竞争力判断。"
+        payload = {
+            "strengths": [
+                "专业排名和 GPA 具备继续冲击强校的基础。",
+                "项目经历可以支撑简历主线和面试表达。",
+            ],
+            "weaknesses": [
+                "科研证明如果不够具体，强校场景下说服力会下降。"
+            ],
+            "suggestions": [
+                "把最相关项目整理成可量化的技术亮点。",
+                "尽快形成统一材料包，并按目标院校补细节。",
+            ],
+            "summary": "当前更适合走冲刺、稳妥、保底并行的申请节奏，先补齐可验证材料，再推进选校和联系。",
+        }
+        return json.dumps(payload, ensure_ascii=False)
 
     def _school_reply(self, prompt: str) -> str:
         reasons = []

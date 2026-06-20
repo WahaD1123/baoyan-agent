@@ -21,6 +21,14 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
+MCP Server (open a second PowerShell terminal):
+
+```powershell
+cd backend
+.\.venv\Scripts\Activate.ps1
+python -m app.mcp_server
+```
+
 Backend tests:
 
 ```powershell
@@ -37,7 +45,7 @@ npm install
 npm run dev
 ```
 
-Open the app at `http://localhost:5173`. The frontend can show mock data even when the backend is not running, but the best demo is with both services started.
+Open the app at `http://localhost:5173`. For the complete middleware demo, keep the Backend, MCP Server, and Frontend running at the same time. The frontend can still show mock data when the backend is unavailable, and Member C records an explicit local fallback when the MCP Server is unavailable.
 
 ## Main Demo Flow
 

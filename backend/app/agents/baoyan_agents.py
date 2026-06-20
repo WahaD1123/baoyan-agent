@@ -92,9 +92,10 @@ class CriticAgent(BaseAgent):
         references: list[str] | None = None,
     ) -> tuple[AgentResult, CriticDecision]:
         prompt = (
-            "Review this Member C output for groundedness, completeness, relevance, and format. "
-            "Reject unsupported facts or missing core sections. Return one JSON object only with "
-            "passed (boolean), score (0-100), summary, issues (max 3), and suggestions (max 3).\n"
+            "请使用简体中文审查成员 C 的输出，检查事实依据、完整性、相关性和格式。"
+            "发现无依据事实或缺少核心部分时应判定为需要修改。只返回一个 JSON 对象，"
+            "字段为 passed（布尔值）、score（0-100）、summary、issues（最多 3 项）和 "
+            "suggestions（最多 3 项）；summary、issues 和 suggestions 的内容必须使用简体中文。\n"
             f"goal={goal}\n"
             f"evidence={evidence_summary}\n"
             f"content={content}"
@@ -106,9 +107,9 @@ class CriticAgent(BaseAgent):
             decision = CriticDecision(
                 passed=False,
                 score=50,
-                summary=f"Critic response could not be validated: {type(exc).__name__}",
-                issues=["The structured critic response was invalid."],
-                suggestions=["Rewrite once using only the collected evidence."],
+                summary=f"质量检查结果无法解析：{type(exc).__name__}",
+                issues=["模型没有返回符合约定格式的结构化审查结果。"],
+                suggestions=["仅依据已收集的证据重新生成一次。"],
             )
         result.output = _format_critic_decision(decision)
         return result, decision
@@ -125,13 +126,30 @@ def _extract_json_object(raw: str) -> dict[str, object]:
 
 
 def _format_critic_decision(decision: CriticDecision) -> str:
-    lines = [
-        f"Decision: {'PASS' if decision.passed else 'REVISE'}",
-        f"Score: {decision.score}",
-        f"Summary: {decision.summary}",
+    sections = [
+        f"**审查结论：** {'通过' if decision.passed else '需要修改'}",
+        f"**评分：** {decision.score} / 100",
+        "### 总结",
+        decision.summary,
     ]
     if decision.issues:
-        lines.append("Issues: " + "; ".join(decision.issues))
+        sections.extend(
+            [
+                "### 主要问题",
+                "\n".join(
+                    f"{index}. {issue}"
+                    for index, issue in enumerate(decision.issues, 1)
+                ),
+            ]
+        )
     if decision.suggestions:
-        lines.append("Suggestions: " + "; ".join(decision.suggestions))
-    return "\n".join(lines)
+        sections.extend(
+            [
+                "### 修改建议",
+                "\n".join(
+                    f"{index}. {suggestion}"
+                    for index, suggestion in enumerate(decision.suggestions, 1)
+                ),
+            ]
+        )
+    return "\n\n".join(sections)

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api } from "./api/client";
 import { sampleAdvisors, sampleProfile } from "./api/mockData";
 import { KnowledgePage } from "./pages/KnowledgePage";
-import { MaterialsPage } from "./pages/MaterialsPage";
+import { MaterialsPage, type MaterialGeneration } from "./pages/MaterialsPage";
 import { PlanningPage } from "./pages/PlanningPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { WorkflowPage } from "./pages/WorkflowPage";
@@ -62,6 +62,7 @@ function App() {
   const [advisorBusy, setAdvisorBusy] = useState(false);
   const [advisorSearchBusy, setAdvisorSearchBusy] = useState(false);
   const [matchingAdvisors, setMatchingAdvisors] = useState(false);
+  const [generatingMaterial, setGeneratingMaterial] = useState<MaterialGeneration | null>(null);
   const [knowledgeStatus, setKnowledgeStatus] = useState("资料库已就绪，可以导入资料、提问或匹配导师。");
 
   useEffect(() => {
@@ -220,27 +221,47 @@ function App() {
   }
 
   async function generateEmail() {
-    const result = await api.generateEmail(profile, advisors[0]);
-    setEmail(result.content);
-    pushWorkflow(result.workflow);
+    setGeneratingMaterial("email");
+    try {
+      const result = await api.generateEmail(profile, advisors[0]);
+      setEmail(result.content);
+      pushWorkflow(result.workflow);
+    } finally {
+      setGeneratingMaterial(null);
+    }
   }
 
   async function generateResumeHighlights() {
-    const result = await api.generateResumeHighlights(profile);
-    setResumeHighlights(result.content);
-    pushWorkflow(result.workflow);
+    setGeneratingMaterial("resume");
+    try {
+      const result = await api.generateResumeHighlights(profile);
+      setResumeHighlights(result.content);
+      pushWorkflow(result.workflow);
+    } finally {
+      setGeneratingMaterial(null);
+    }
   }
 
   async function generateStatement() {
-    const result = await api.generateStatement(profile);
-    setStatement(result.content);
-    pushWorkflow(result.workflow);
+    setGeneratingMaterial("statement");
+    try {
+      const result = await api.generateStatement(profile);
+      setStatement(result.content);
+      pushWorkflow(result.workflow);
+    } finally {
+      setGeneratingMaterial(null);
+    }
   }
 
   async function generateInterview() {
-    const result = await api.generateInterview(profile);
-    setInterview(result.content);
-    pushWorkflow(result.workflow);
+    setGeneratingMaterial("interview");
+    try {
+      const result = await api.generateInterview(profile);
+      setInterview(result.content);
+      pushWorkflow(result.workflow);
+    } finally {
+      setGeneratingMaterial(null);
+    }
   }
 
   async function refreshWorkflows() {
@@ -374,6 +395,7 @@ function App() {
             resumeHighlights={resumeHighlights}
             statement={statement}
             interview={interview}
+            generating={generatingMaterial}
             onEmail={generateEmail}
             onResumeHighlights={generateResumeHighlights}
             onStatement={generateStatement}

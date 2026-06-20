@@ -207,7 +207,7 @@ def test_member_c_generates_categorized_interview_with_critic_workflow() -> None
     assert "项目追问" in response.json()["content"]
 
 
-def test_member_c_prompts_bound_generated_output() -> None:
+def _legacy_member_c_prompts_bound_generated_output() -> None:
     profile = client.get("/api/profile").json()
     advisor = client.get("/api/knowledge/advisors").json()[0]
     cases = [
@@ -240,3 +240,48 @@ def test_member_c_prompts_bound_generated_output() -> None:
         assert generation_rule in steps[0]["agent_result"]["input_summary"]
         assert "不要使用 Markdown 表格" in steps[1]["agent_result"]["input_summary"]
         assert "400 字以内" in steps[1]["agent_result"]["input_summary"]
+
+
+def test_member_c_dynamic_steps_keep_generation_bounds() -> None:
+    profile = client.get("/api/profile").json()
+    advisor = client.get("/api/knowledge/advisors").json()[0]
+    cases = [
+        (
+            "/api/materials/email",
+            {"profile": profile, "advisor": advisor, "purpose": "summer camp application"},
+            "within 600 Chinese characters",
+        ),
+        (
+            "/api/materials/resume-highlights",
+            {"profile": profile, "target_direction": "AI systems"},
+            "at most 100 Chinese characters",
+        ),
+        (
+            "/api/materials/statement",
+            {"profile": profile, "target_school": "SJTU", "direction": "AI", "tone": "concise"},
+            "within 700 Chinese characters",
+        ),
+        (
+            "/api/interview/mock",
+            {"profile": profile, "target_school": "SJTU", "direction": "AI"},
+            "at most 15 questions",
+        ),
+    ]
+
+    for path, payload, generation_rule in cases:
+        response = client.post(path, json=payload)
+        assert response.status_code == 200
+        workflow = response.json()["workflow"]
+        generation = next(
+            step for step in workflow["steps"]
+            if step["capability"].endswith(".generate")
+        )
+        critic = next(
+            step for step in workflow["steps"]
+            if step["capability"] == "critic.review"
+        )
+        assert generation_rule in generation["agent_result"]["input_summary"]
+        assert "Return one JSON object only" in critic["agent_result"]["input_summary"]
+        assert workflow["plan_source"] in {"planner", "fallback"}
+        assert generation["model_name"]
+        assert critic["model_name"]

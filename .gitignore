@@ -28,3 +28,4 @@ data/store/
 
 .DS_Store
 Thumbs.db
+.demo/

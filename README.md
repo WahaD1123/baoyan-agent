@@ -76,3 +76,56 @@ Member B owns the heterogeneous knowledge module:
 ## Team Guide
 
 Read [docs/TEAM_GUIDE.md](docs/TEAM_GUIDE.md) before adding new modules. Read [docs/API.md](docs/API.md) before changing API contracts.
+
+## One-command Demo
+
+Install backend and frontend dependencies once, then start all three processes from the repository root:
+
+```powershell
+pip install -r backend/requirements.txt
+cd frontend
+npm install
+cd ..
+.\start-demo.ps1
+```
+
+The script starts:
+
+- Frontend: `http://127.0.0.1:5173`
+- FastAPI business service: `http://127.0.0.1:8000`
+- Streamable HTTP MCP server: `http://127.0.0.1:8002/mcp`
+
+Stop every process started by the script with:
+
+```powershell
+.\stop-demo.ps1
+```
+
+The scripts accept `-FrontendPort`, `-BackendPort`, and `-McpPort` when the default ports are occupied. Runtime PID files and logs are written under the ignored `.demo/` directory.
+
+## Member C Middleware Flow
+
+The existing material and interview buttons remain stable API entry points. Internally, each request now runs this constrained dynamic flow:
+
+```text
+button / existing API
+  -> Qwen TaskPlanner
+  -> Pydantic + Capability Registry validation
+  -> Workflow Executor
+  -> Streamable HTTP MCP tools
+  -> MaterialAgent or InterviewAgent
+  -> structured CriticAgent
+  -> at most one conditional revision
+  -> persisted Workflow trace
+```
+
+The Planner may only select registered capabilities and at most eight steps. Required profile, advisor, and knowledge tools are validated from request context. Invalid plans fall back to a deterministic safe plan. The Workflow page exposes the selected plan, MCP transport, arguments and result summaries, model route, duration, Critic decision, and revision status.
+
+Manual MCP startup:
+
+```powershell
+cd backend
+python -m app.mcp_server
+```
+
+When the MCP service is unavailable, Member C can use the same allow-listed local tool implementations if `MCP_LOCAL_FALLBACK=true`. A trace explicitly records `local_fallback`; it is never presented as a successful MCP network call.

@@ -13,6 +13,18 @@ class MockLLMProvider:
 
     def generate(self, prompt: str, task: str = "general") -> str:
         compact = " ".join(prompt.split())
+        if task == "workflow_planner":
+            return self._workflow_plan_reply(prompt)
+        if task == "critic_structured":
+            return json.dumps(
+                {
+                    "passed": False,
+                    "score": 72,
+                    "summary": "The deterministic demo critic requests one grounded revision.",
+                    "issues": ["Verify every claim against collected evidence."],
+                    "suggestions": ["Keep only facts present in the tool context."],
+                }
+            )
         if task == "profile":
             return self._profile_reply(compact)
         if task == "school":
@@ -74,6 +86,47 @@ class MockLLMProvider:
             return "系统已提取资料中的学校、材料要求、考核形式和其他关键字段。"
         return f"系统已完成 {task} 任务。"
 
+    def _workflow_plan_reply(self, prompt: str) -> str:
+        goal = "generate_advisor_email"
+        for candidate in (
+            "generate_advisor_email",
+            "generate_resume_highlights",
+            "generate_statement",
+            "generate_interview",
+        ):
+            if f"goal={candidate}" in prompt:
+                goal = candidate
+                break
+
+        steps: list[dict[str, str]] = [
+            {"kind": "tool", "capability": "profile.build_context"}
+        ]
+        lowered = prompt.lower()
+        if goal == "generate_advisor_email" and '"has_advisor": true' in lowered:
+            steps.append({"kind": "tool", "capability": "advisor.get_context"})
+        if goal == "generate_interview":
+            if '"has_knowledge": true' in lowered:
+                steps.append({"kind": "tool", "capability": "interview.retrieve_evidence"})
+            generate_capability = "interview.generate"
+            revise_capability = "interview.revise"
+        else:
+            if '"has_knowledge": true' in lowered:
+                steps.append({"kind": "tool", "capability": "knowledge.search"})
+            generate_capability = "material.generate"
+            revise_capability = "material.revise"
+        steps.extend(
+            [
+                {"kind": "agent", "capability": generate_capability},
+                {"kind": "agent", "capability": "critic.review"},
+                {
+                    "kind": "agent",
+                    "capability": revise_capability,
+                    "condition": "critic_failed",
+                },
+            ]
+        )
+        return json.dumps({"goal": goal, "steps": steps})
+
     def _profile_reply(self, prompt: str) -> str:
         pieces = []
         if "rank top" in prompt.lower() or "排名" in prompt:
@@ -131,6 +184,8 @@ class DashScopeProvider:
         self.model = settings.llm_model or "qwen-plus"
         self.critic_model = settings.llm_critic_model
         self.critic_max_tokens = settings.llm_critic_max_tokens
+        self.planner_model = settings.llm_planner_model
+        self.planner_max_tokens = settings.llm_planner_max_tokens
         self.member_c_fallback_model = settings.llm_member_c_fallback_model
         self.member_c_max_tokens = settings.llm_member_c_max_tokens
         self.fallback = MockLLMProvider()
@@ -144,14 +199,23 @@ class DashScopeProvider:
             "advisor": "你是 CS 保研导师匹配助手。输出研究方向、匹配理由、风险点和联系建议。",
             "extract": "你是信息抽取助手。请用清晰中文总结，并尽量保留关键字段。",
             "critic": "你是审查助手。检查输出是否具体、是否有依据、是否有编造风险。",
+            "critic_structured": (
+                "You are a strict application-material reviewer. Return JSON only with "
+                "passed, score, summary, issues, and suggestions fields."
+            ),
+            "workflow_planner": "你是受约束的工作流规划智能体。只能输出符合给定 schema 的 JSON，并且只能选择能力清单中的名称。",
             "school": "你是保研院校规划助手。请基于学生画像和检索证据，给出简短而明确的院校建议。",
             "planner": "你是保研规划助手。请基于推荐院校和准备节奏，给出下一步行动建议。",
             "profile": "你是学生画像分析助手。请概括学业、科研、项目和语言优势，并指出短板。",
             "material": "你是CS保研申请材料助手。请生成具体、克制、有证据的中文申请材料，避免空泛夸大。",
             "interview": "你是CS保研模拟面试官。请按项目、专业基础、科研方向和英文面试分类出题。",
         }
-        primary_model = self.critic_model if task == "critic" else self.model
-        max_tokens = self.critic_max_tokens if task == "critic" else None
+        if task in {"critic", "critic_structured"}:
+            primary_model, max_tokens = self.critic_model, self.critic_max_tokens
+        elif task == "workflow_planner":
+            primary_model, max_tokens = self.planner_model, self.planner_max_tokens
+        else:
+            primary_model, max_tokens = self.model, None
         if task in {"material", "interview"}:
             max_tokens = self.member_c_max_tokens
         try:
@@ -215,6 +279,17 @@ class DashScopeProvider:
             content = data["choices"][0]["message"]["content"]
             logger.info("DashScope success for task=%s model=%s chars=%s", task, model, len(content))
             return content
+
+
+def model_name_for_task(task: str) -> str:
+    settings = get_settings()
+    if settings.llm_provider.lower() != "dashscope":
+        return "mock"
+    if task in {"critic", "critic_structured"}:
+        return settings.llm_critic_model
+    if task == "workflow_planner":
+        return settings.llm_planner_model
+    return settings.llm_model or "qwen-plus"
 
 
 def get_llm_provider() -> MockLLMProvider | DashScopeProvider:

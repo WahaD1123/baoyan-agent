@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from time import perf_counter
 
 from agents import Agent, ModelSettings, RunContextWrapper, Runner, function_tool
@@ -29,6 +29,8 @@ from app.services.planning_service import (
 )
 from app.services.store import store
 from app.tools.member_a_tools import chunk_titles, validate_analysis, validate_recommendations
+
+UTC = timezone.utc
 
 
 @dataclass

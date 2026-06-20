@@ -86,18 +86,19 @@ def knowledge_add_url(url: str, doc_type: DocumentType = "notice", title: str = 
 
 
 def knowledge_query(question: str, top_k: int = 3) -> dict[str, Any]:
-    from app.workflows.engine import run_knowledge_workflow
-
     documents = route_documents_by_library(question, store.documents, top_k)
     chunks = route_chunks_for_documents(question, documents, top_k)
-    workflow = run_knowledge_workflow(question, documents, chunks)
-    store.add_workflow(workflow)
     return {
         "question": question,
-        "answer": workflow.final_result,
+        "answer": _draft_knowledge_answer(question, documents, chunks),
         "documents": [_document_summary(document, include_content=True) for document in documents],
         "chunks": [chunk.model_dump(mode="json") for chunk in chunks],
-        "workflow": _workflow_summary(workflow),
+        "workflow": {
+            "type": "knowledge",
+            "status": "completed",
+            "steps": ["Route documents from local knowledge library", "Collect citation chunks"],
+            "final_result": f"Retrieved {len(documents)} documents and {len(chunks)} chunks.",
+        },
     }
 
 
@@ -156,16 +157,41 @@ def advisor_list(limit: int = 20) -> dict[str, Any]:
     }
 
 
+def _draft_knowledge_answer(question: str, documents: list[Document], chunks: list[Any]) -> str:
+    if not documents:
+        return (
+            f"资料库暂未命中与“{question}”直接相关的材料。"
+            "建议先上传通知、经验贴或导师主页，再进行基于资料的问答。"
+        )
+    lines = [f"已根据资料库中与“{question}”相关的材料整理出初步答案。"]
+    for document in documents[:3]:
+        summary = str(document.analysis.get("summary") or document.extracted or "").strip()
+        if summary:
+            lines.append(f"- {document.title}: {summary[:220]}")
+        else:
+            lines.append(f"- {document.title}: {document.content[:220]}")
+    if chunks:
+        lines.append("引用片段：")
+        for index, chunk in enumerate(chunks[:3], start=1):
+            lines.append(f"[{index}] {chunk.document_title}: {chunk.text[:180]}")
+    else:
+        lines.append("当前资料有结构化记录，但缺少可展示的引用片段。")
+    return "\n".join(lines)
+
+
 def advisor_match(profile: dict[str, Any], top_k: int = 3) -> dict[str, Any]:
-    from app.workflows.engine import run_advisor_match_workflow, score_advisors
+    from app.workflows.engine import score_advisors
 
     student = StudentProfile.model_validate(profile)
     matches = score_advisors(student, store.advisors, top_k)
-    workflow = run_advisor_match_workflow(student, [item.advisor for item in matches], matches)
-    store.add_workflow(workflow)
     return {
         "matches": [match.model_dump(mode="json") for match in matches],
-        "workflow": _workflow_summary(workflow),
+        "workflow": {
+            "type": "advisor_match",
+            "status": "completed",
+            "steps": ["Score advisors from local advisor library"],
+            "final_result": f"Scored {len(matches)} advisor candidates.",
+        },
     }
 
 

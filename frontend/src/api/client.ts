@@ -20,6 +20,9 @@ async function request<T>(path: string, options?: RequestInit, fallback?: T): Pr
     }
     return (await response.json()) as T;
   } catch {
+    if (path.startsWith("/api/knowledge/")) {
+      throw new Error(`Request failed: ${path}`);
+    }
     if (fallback !== undefined) {
       return fallback;
     }
@@ -104,7 +107,7 @@ export const api = {
       "/api/knowledge/query",
       { method: "POST", headers: jsonHeaders, body: JSON.stringify({ question }) }
     ),
-  getAdvisors: () => request<Advisor[]>("/api/knowledge/advisors", undefined, sampleAdvisors),
+  getAdvisors: () => request<Advisor[]>("/api/knowledge/advisors"),
   addAdvisorUrl: (url: string, title?: string) =>
     request<{ advisor: Advisor; document: DocumentItem; workflow: WorkflowRun }>(
       "/api/knowledge/advisors/url",

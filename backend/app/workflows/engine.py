@@ -1,3 +1,6 @@
+import json
+import re
+
 from app.agents import (
     AdvisorMatchAgent,
     CriticAgent,
@@ -133,6 +136,85 @@ def score_advisors(profile: StudentProfile, advisors: list[Advisor], top_k: int 
             )
         )
     return sorted(results, key=lambda item: item.score, reverse=True)[:top_k]
+
+
+def match_advisors_with_llm(
+    profile: StudentProfile,
+    advisors: list[Advisor],
+    top_k: int = 3,
+) -> list[AdvisorMatchResult]:
+    if not advisors:
+        return []
+    advisor_records = [
+        {
+            "id": advisor.id,
+            "name": advisor.name,
+            "university": advisor.university,
+            "department": advisor.department,
+            "research_areas": advisor.research_areas,
+            "summary": advisor.summary,
+            "representative_works": advisor.representative_works[:5],
+            "suitable_background": advisor.suitable_background,
+            "homepage": advisor.homepage,
+        }
+        for advisor in advisors
+    ]
+    prompt = (
+        "请基于语义理解进行导师匹配，不要只做字符串完全匹配。需要考虑中文/英文同义表达、研究方向包含关系、"
+        "项目经历与导师方向的潜在相关性、目标学校偏好和联系风险。\n"
+        "只返回 JSON，不要使用 Markdown 或额外说明。JSON schema:\n"
+        "{\"matches\":[{\"advisor_id\":\"...\",\"score\":0-100,\"reasons\":[\"...\"],\"risks\":[\"...\"],"
+        "\"contact_suggestion\":\"...\"}]}\n"
+        f"top_k={top_k}\n"
+        "PROFILE_JSON:\n"
+        f"{profile.model_dump_json()}\n"
+        "END_PROFILE_JSON\n"
+        "ADVISORS_JSON:\n"
+        f"{json.dumps(advisor_records, ensure_ascii=False)}\n"
+        "END_ADVISORS_JSON"
+    )
+    raw = get_llm_provider().generate(prompt, task="advisor_match_structured")
+    if "[DashScope fallback:" in raw:
+        raise RuntimeError("LLM advisor matching failed and fallback output was rejected")
+    parsed = _parse_json_object(raw)
+    advisor_by_id = {advisor.id: advisor for advisor in advisors}
+    matches: list[AdvisorMatchResult] = []
+    seen: set[str] = set()
+    for item in parsed.get("matches", []):
+        advisor_id = str(item.get("advisor_id", "")).strip()
+        advisor = advisor_by_id.get(advisor_id)
+        if advisor is None or advisor_id in seen:
+            continue
+        seen.add(advisor_id)
+        matches.append(
+            AdvisorMatchResult(
+                advisor=advisor,
+                score=round(max(0.0, min(100.0, float(item.get("score", 0)))), 1),
+                reasons=[str(reason) for reason in item.get("reasons", []) if str(reason).strip()],
+                risks=[str(risk) for risk in item.get("risks", []) if str(risk).strip()],
+                contact_suggestion=str(item.get("contact_suggestion", "")).strip(),
+            )
+        )
+    if not matches:
+        raise RuntimeError("LLM advisor matching returned no valid advisor IDs")
+    return sorted(matches, key=lambda item: item.score, reverse=True)[:top_k]
+
+
+def _parse_json_object(raw: str) -> dict:
+    cleaned = raw.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
+        cleaned = re.sub(r"\s*```$", "", cleaned)
+    try:
+        parsed = json.loads(cleaned)
+    except json.JSONDecodeError:
+        match = re.search(r"\{.*\}", cleaned, flags=re.DOTALL)
+        if not match:
+            raise
+        parsed = json.loads(match.group(0))
+    if not isinstance(parsed, dict):
+        raise TypeError("LLM advisor matching output must be a JSON object")
+    return parsed
 
 
 def run_advisor_match_workflow(

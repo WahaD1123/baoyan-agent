@@ -33,6 +33,8 @@ class MockLLMProvider:
             return self._planner_reply(compact)
         if task == "knowledge":
             return "系统已结合命中的资料片段生成回答，重点关注截止时间、材料要求、研究方向和考核形式。"
+        if task == "advisor_match_structured":
+            return self._advisor_match_structured_reply(prompt)
         if task == "advisor":
             return "系统已根据研究兴趣、项目背景和导师方向生成匹配建议，并提示联系重点。"
         if task == "material":
@@ -183,6 +185,50 @@ class MockLLMProvider:
         return " ".join(lines[:2]) or "系统已根据推荐结果生成分周准备节奏。"
 
 
+    def _advisor_match_structured_reply(self, prompt: str) -> str:
+        try:
+            profile_raw = prompt.split("PROFILE_JSON:", 1)[1].split("END_PROFILE_JSON", 1)[0].strip()
+            advisors_raw = prompt.split("ADVISORS_JSON:", 1)[1].split("END_ADVISORS_JSON", 1)[0].strip()
+            profile = json.loads(profile_raw)
+            advisors = json.loads(advisors_raw)
+        except (IndexError, json.JSONDecodeError):
+            profile = {}
+            advisors = []
+        interests = [str(item).lower() for item in profile.get("research_interests", [])]
+        preferred = [
+            str(item).lower()
+            for item in profile.get("preferred_schools", []) + profile.get("target_regions", [])
+        ]
+        matches = []
+        for index, advisor in enumerate(advisors):
+            advisor_text = " ".join(
+                [
+                    str(advisor.get("university", "")),
+                    str(advisor.get("department", "")),
+                    str(advisor.get("summary", "")),
+                    str(advisor.get("suitable_background", "")),
+                    " ".join(str(item) for item in advisor.get("research_areas", [])),
+                ]
+            ).lower()
+            semantic_hits = [item for item in interests if item and item in advisor_text]
+            school_hit = any(item and item in advisor_text for item in preferred)
+            score = min(100, 72 + len(semantic_hits) * 8 + (8 if school_hit else 0) - index * 3)
+            matches.append(
+                {
+                    "advisor_id": advisor.get("id", ""),
+                    "score": score,
+                    "reasons": semantic_hits
+                    and [f"\u7814\u7a76\u5174\u8da3\u4e0e\u5bfc\u5e08\u65b9\u5411\u8bed\u4e49\u76f8\u5173: {', '.join(semantic_hits)}"]
+                    or ["\u5bfc\u5e08\u8d44\u6599\u4e0e\u5f53\u524d\u753b\u50cf\u5b58\u5728\u6f5c\u5728\u76f8\u5173\u6027\uff0c\u5efa\u8bae\u8fdb\u4e00\u6b65\u6838\u5bf9\u4e3b\u9875\u3002"],
+                    "risks": []
+                    if semantic_hits
+                    else ["\u5f53\u524d\u8bed\u4e49\u8bc1\u636e\u8f83\u5c11\uff0c\u5efa\u8bae\u8865\u5145\u66f4\u5177\u4f53\u7684\u7814\u7a76\u5174\u8da3\u6216\u9879\u76ee\u7ecf\u5386\u3002"],
+                    "contact_suggestion": "\u8054\u7cfb\u65f6\u5148\u8bf4\u660e\u6700\u76f8\u5173\u7684\u9879\u76ee\u7ecf\u5386\uff0c\u518d\u5bf9\u5e94\u5bfc\u5e08\u4e3b\u9875\u4e2d\u7684\u7814\u7a76\u65b9\u5411\u63d0\u51fa\u5177\u4f53\u4ea4\u6d41\u95ee\u9898\u3002",
+                }
+            )
+        return json.dumps({"matches": matches[: max(1, min(5, len(matches)))]}, ensure_ascii=False)
+
+
 class DashScopeProvider:
     def __init__(self) -> None:
         settings = get_settings()
@@ -203,6 +249,11 @@ class DashScopeProvider:
             return self.fallback.generate(prompt, task)
         system_prompts = {
             "knowledge": "你是 CS 保研资料知识库助手。只基于给定资料回答，并明确指出引用来源。",
+            "advisor_match_structured": (
+                "You are a CS graduate-recommendation advisor semantic matching judge. "
+                "Return JSON only, no Markdown. Rank advisors by semantic fit with the student profile. "
+                "Each match must include advisor_id, score, reasons, risks, and contact_suggestion."
+            ),
             "advisor": "你是 CS 保研导师匹配助手。输出研究方向、匹配理由、风险点和联系建议。",
             "extract": "你是信息抽取助手。请用清晰中文总结，并尽量保留关键字段。",
             "critic": "你是审查助手。检查输出是否具体、是否有依据、是否有编造风险。",

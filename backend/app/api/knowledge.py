@@ -13,11 +13,10 @@ from app.models import (
     UrlDocumentRequest,
 )
 from app.services.boardcaster_service import import_boardcaster_documents
-from app.services.library_router import route_chunks_for_documents, route_documents_by_library
 from app.services.store import store
 from app.tools.document_processing import extract_text_from_pdf, prepare_document
 from app.tools.web_crawler import crawl_url
-from app.workflows import run_advisor_match_workflow, run_ingest_workflow, run_knowledge_workflow, score_advisors
+from app.workflows import execute_advisor_match, execute_knowledge_query, run_ingest_workflow
 
 router = APIRouter()
 
@@ -129,11 +128,9 @@ def add_url_document(payload: UrlDocumentRequest) -> dict[str, object]:
 
 @router.post("/query", response_model=KnowledgeResponse)
 def query_knowledge(payload: KnowledgeQuery) -> KnowledgeResponse:
-    docs = route_documents_by_library(payload.question, store.documents, payload.top_k)
-    chunks = route_chunks_for_documents(payload.question, docs, payload.top_k)
-    workflow = run_knowledge_workflow(payload.question, docs, chunks)
-    store.add_workflow(workflow)
-    return KnowledgeResponse(answer=workflow.final_result, documents=docs, chunks=chunks, workflow=workflow)
+    response = execute_knowledge_query(payload)
+    store.add_workflow(response.workflow)
+    return response
 
 
 @router.get("/advisors", response_model=list[Advisor])
@@ -192,7 +189,6 @@ def search_advisors(payload: AdvisorSearchRequest) -> dict[str, object]:
 
 @router.post("/advisors/match", response_model=AdvisorMatchResponse)
 def match_advisors(payload: AdvisorMatchRequest) -> AdvisorMatchResponse:
-    matches = score_advisors(payload.profile, store.advisors, payload.top_k)
-    workflow = run_advisor_match_workflow(payload.profile, [item.advisor for item in matches], matches)
-    store.add_workflow(workflow)
-    return AdvisorMatchResponse(matches=matches, workflow=workflow)
+    response = execute_advisor_match(payload)
+    store.add_workflow(response.workflow)
+    return response

@@ -5,7 +5,6 @@ from app.services.library_router import route_chunks_for_documents, route_docume
 from app.services.store import store
 from app.tools.document_processing import prepare_document
 from app.tools.web_crawler import crawl_url
-from app.workflows.engine import run_advisor_match_workflow, run_ingest_workflow, run_knowledge_workflow, score_advisors
 
 
 def _workflow_summary(workflow) -> dict[str, Any]:
@@ -47,6 +46,8 @@ def knowledge_add_text(
     doc_type: DocumentType = "other",
     source: str = "mcp_text",
 ) -> dict[str, Any]:
+    from app.workflows.engine import run_ingest_workflow
+
     document = prepare_document(
         Document(
             title=title or "Untitled text material",
@@ -63,6 +64,8 @@ def knowledge_add_text(
 
 
 def knowledge_add_url(url: str, doc_type: DocumentType = "notice", title: str = "") -> dict[str, Any]:
+    from app.workflows.engine import run_ingest_workflow
+
     crawled = crawl_url(url)
     if crawled.status == "failed":
         return {"status": "failed", "error": crawled.error or "Failed to crawl URL", "url": url}
@@ -83,6 +86,8 @@ def knowledge_add_url(url: str, doc_type: DocumentType = "notice", title: str = 
 
 
 def knowledge_query(question: str, top_k: int = 3) -> dict[str, Any]:
+    from app.workflows.engine import run_knowledge_workflow
+
     documents = route_documents_by_library(question, store.documents, top_k)
     chunks = route_chunks_for_documents(question, documents, top_k)
     workflow = run_knowledge_workflow(question, documents, chunks)
@@ -90,7 +95,7 @@ def knowledge_query(question: str, top_k: int = 3) -> dict[str, Any]:
     return {
         "question": question,
         "answer": workflow.final_result,
-        "documents": [_document_summary(document) for document in documents],
+        "documents": [_document_summary(document, include_content=True) for document in documents],
         "chunks": [chunk.model_dump(mode="json") for chunk in chunks],
         "workflow": _workflow_summary(workflow),
     }
@@ -105,6 +110,8 @@ def knowledge_list_documents(limit: int = 20, include_content: bool = False) -> 
 
 
 def advisor_add_url(url: str, title: str = "") -> dict[str, Any]:
+    from app.workflows.engine import run_ingest_workflow
+
     crawled = crawl_url(url)
     if crawled.status == "failed":
         return {"status": "failed", "error": crawled.error or "Failed to crawl advisor URL", "url": url}
@@ -150,6 +157,8 @@ def advisor_list(limit: int = 20) -> dict[str, Any]:
 
 
 def advisor_match(profile: dict[str, Any], top_k: int = 3) -> dict[str, Any]:
+    from app.workflows.engine import run_advisor_match_workflow, score_advisors
+
     student = StudentProfile.model_validate(profile)
     matches = score_advisors(student, store.advisors, top_k)
     workflow = run_advisor_match_workflow(student, [item.advisor for item in matches], matches)
@@ -161,12 +170,24 @@ def advisor_match(profile: dict[str, Any], top_k: int = 3) -> dict[str, Any]:
 
 
 def member_b_tool_names() -> list[str]:
-    return [
-        "knowledge.add_text",
-        "knowledge.add_url",
-        "knowledge.query",
-        "knowledge.list_documents",
-        "advisor.add_url",
-        "advisor.list",
-        "advisor.match",
-    ]
+    return list(_TOOL_HANDLERS)
+
+
+ToolHandler = Any
+
+_TOOL_HANDLERS: dict[str, ToolHandler] = {
+    "knowledge.add_text": knowledge_add_text,
+    "knowledge.add_url": knowledge_add_url,
+    "knowledge.query": knowledge_query,
+    "knowledge.list_documents": knowledge_list_documents,
+    "advisor.add_url": advisor_add_url,
+    "advisor.list": advisor_list,
+    "advisor.match": advisor_match,
+}
+
+
+def dispatch_local_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    handler = _TOOL_HANDLERS.get(name)
+    if handler is None:
+        raise ValueError(f"Unknown Member B tool: {name}")
+    return handler(**arguments)

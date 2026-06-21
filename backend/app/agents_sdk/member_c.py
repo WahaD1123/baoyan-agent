@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from dataclasses import dataclass
 from typing import Literal, Protocol
 
 from app.agents_sdk.runtime import AgentSdkRuntime, get_agent_sdk_runtime
-from app.services.llm import get_llm_provider, model_name_for_task
+from app.core.config import get_settings
+from app.services.llm import MockLLMProvider, get_llm_provider, model_name_for_task
 
 try:
     from agents import Agent, ModelSettings, Runner
@@ -17,6 +19,11 @@ except ModuleNotFoundError:  # pragma: no cover
 
 
 logger = logging.getLogger("baoyan-agent.member-c-sdk")
+
+_FALLBACK_MARKER = re.compile(
+    r"\s*\[DashScope fallback:\s*([^\]]+)\]\s*$",
+    flags=re.IGNORECASE,
+)
 
 
 class AgentLLM(Protocol):
@@ -58,9 +65,15 @@ class MemberCAgentSdkLLM:
         self,
         runtime: AgentSdkRuntime | None = None,
         fallback: AgentLLM | None = None,
+        timeout_seconds: float | None = None,
     ) -> None:
         self.runtime = runtime or get_agent_sdk_runtime()
-        self.fallback = fallback or get_llm_provider()
+        self.fallback = fallback or MockLLMProvider()
+        self.timeout_seconds = (
+            timeout_seconds
+            if timeout_seconds is not None
+            else get_settings().llm_member_c_timeout_seconds
+        )
         self.last_call: MemberCAgentCall | None = None
 
     def generate(self, prompt: str, task: str = "general") -> str:
@@ -75,12 +88,16 @@ class MemberCAgentSdkLLM:
                 model_name,
                 reason,
             )
+            fallback_output = self.fallback.generate(prompt, task=task)
+            fallback_output, provider_reason = _remove_fallback_marker(fallback_output)
+            if provider_reason:
+                reason = f"{reason}; DashScope fallback: {provider_reason}"
             self.last_call = MemberCAgentCall(
                 source="fallback",
                 model_name=model_name,
                 fallback_reason=reason,
             )
-            return self.fallback.generate(prompt, task=task)
+            return fallback_output
 
         self.last_call = MemberCAgentCall(source="sdk", model_name=model_name)
         return output
@@ -100,7 +117,10 @@ class MemberCAgentSdkLLM:
         )
         agent = Agent(
             name=agent_name,
-            model=self.runtime.build_model(model_name),
+            model=self.runtime.build_model(
+                model_name,
+                timeout_seconds=self.timeout_seconds,
+            ),
             model_settings=ModelSettings(temperature=0.2),
             instructions=instructions,
         )
@@ -112,3 +132,10 @@ def build_member_c_agent_llm() -> AgentLLM:
     if os.getenv("PYTEST_CURRENT_TEST"):
         return get_llm_provider()
     return MemberCAgentSdkLLM()
+
+
+def _remove_fallback_marker(output: str) -> tuple[str, str]:
+    match = _FALLBACK_MARKER.search(output)
+    if not match:
+        return output, ""
+    return output[: match.start()].rstrip(), match.group(1).strip()

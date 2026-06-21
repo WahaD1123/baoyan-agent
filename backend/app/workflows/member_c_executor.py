@@ -1,4 +1,5 @@
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from time import perf_counter
@@ -67,9 +68,15 @@ class MemberCWorkflowExecutor:
         draft: AgentResult | None = None
         review: AgentResult | None = None
         decision: CriticDecision | None = None
+        revision_applied = False
+        revision_preserved = False
 
         for planned_step in planning.plan.steps:
-            if planned_step.condition == "critic_failed" and decision and decision.passed:
+            if (
+                planned_step.condition == "critic_failed"
+                and decision
+                and not _needs_automatic_revision(decision)
+            ):
                 steps.append(
                     WorkflowStep(
                         name=f"Skip {planned_step.capability}",
@@ -97,8 +104,15 @@ class MemberCWorkflowExecutor:
                 elif planned_step.capability.endswith(".revise"):
                     if draft is None or decision is None:
                         raise RuntimeError("Revision requires a draft and critic decision")
-                    trace, draft = self._run_revision(task, planned_step, collected, draft, decision)
+                    trace, draft, revision_applied = self._run_revision(
+                        task,
+                        planned_step,
+                        collected,
+                        draft,
+                        decision,
+                    )
                     steps.append(trace)
+                    revision_preserved = not revision_applied
                 else:
                     raise ValueError(f"Unsupported capability: {planned_step.capability}")
             except Exception as exc:
@@ -134,7 +148,13 @@ class MemberCWorkflowExecutor:
             workflow_type=task.workflow_type,
             status="completed",
             steps=steps,
-            final_result=self._final_result(task.title, draft.output, review, decision),
+            final_result=self._final_result(
+                task.title,
+                draft.output,
+                decision,
+                revision_applied,
+                revision_preserved,
+            ),
             plan_source=planning.source,
             planner_summary=planning.summary,
         )
@@ -198,11 +218,14 @@ class MemberCWorkflowExecutor:
         started_at = datetime.now(UTC)
         started = perf_counter()
         if planned_step.capability == "interview.generate":
-            result = self.interview_agent.generate(prompt, task.references)
+            agent = self.interview_agent
             model_task = "interview"
         else:
-            result = self.material_agent.generate(prompt, task.references)
+            agent = self.material_agent
             model_task = "material"
+        result = agent.generate(prompt, task.references)
+        result.output = _normalize_generated_content(result.output, task.goal)
+        model_name, reason = _agent_execution_trace(agent, model_task, planned_step.reason)
         completed_at = datetime.now(UTC)
         return (
             WorkflowStep(
@@ -210,8 +233,8 @@ class MemberCWorkflowExecutor:
                 status="completed",
                 step_type="agent",
                 capability=planned_step.capability,
-                decision_reason=planned_step.reason,
-                model_name=model_name_for_task(model_task),
+                decision_reason=reason,
+                model_name=model_name,
                 started_at=started_at,
                 completed_at=completed_at,
                 duration_ms=_elapsed_ms(started),
@@ -234,7 +257,13 @@ class MemberCWorkflowExecutor:
             draft.output,
             task.goal,
             evidence,
+            task.generation_rules,
             [*task.references, draft.id],
+        )
+        model_name, execution_reason = _agent_execution_trace(
+            self.critic_agent,
+            "critic_structured",
+            f"passed={decision.passed}; score={decision.score}; {decision.summary}",
         )
         completed_at = datetime.now(UTC)
         return (
@@ -243,10 +272,8 @@ class MemberCWorkflowExecutor:
                 status="completed",
                 step_type="agent",
                 capability=planned_step.capability,
-                decision_reason=(
-                    f"passed={decision.passed}; score={decision.score}; {decision.summary}"
-                ),
-                model_name=model_name_for_task("critic_structured"),
+                decision_reason=execution_reason,
+                model_name=model_name,
                 started_at=started_at,
                 completed_at=completed_at,
                 duration_ms=_elapsed_ms(started),
@@ -263,16 +290,34 @@ class MemberCWorkflowExecutor:
         collected: dict[str, dict[str, Any]],
         draft: AgentResult,
         decision: CriticDecision,
-    ) -> tuple[WorkflowStep, AgentResult]:
+    ) -> tuple[WorkflowStep, AgentResult, bool]:
         context = _json_summary(collected, limit=1800)
         started_at = datetime.now(UTC)
         started = perf_counter()
         if planned_step.capability == "interview.revise":
-            result = self.interview_agent.revise(draft.output, decision, context, task.references)
+            agent = self.interview_agent
             model_task = "interview"
         else:
-            result = self.material_agent.revise(draft.output, decision, context, task.references)
+            agent = self.material_agent
             model_task = "material"
+        result = agent.revise(
+            draft.output,
+            decision,
+            context,
+            task.generation_rules,
+            task.references,
+        )
+        model_name, reason = _agent_execution_trace(
+            agent,
+            model_task,
+            "Critic rejected the first draft; one bounded revision was executed.",
+        )
+        revision_applied = not _agent_used_fallback(agent)
+        if revision_applied:
+            result.output = _normalize_generated_content(result.output, task.goal)
+        else:
+            result.output = draft.output
+            reason += " Revision fallback was discarded; kept the original draft."
         completed_at = datetime.now(UTC)
         return (
             WorkflowStep(
@@ -280,14 +325,15 @@ class MemberCWorkflowExecutor:
                 status="completed",
                 step_type="agent",
                 capability=planned_step.capability,
-                decision_reason="Critic rejected the first draft; one bounded revision was executed.",
-                model_name=model_name_for_task(model_task),
+                decision_reason=reason,
+                model_name=model_name,
                 started_at=started_at,
                 completed_at=completed_at,
                 duration_ms=_elapsed_ms(started),
                 agent_result=result,
             ),
             result,
+            revision_applied,
         )
 
     def _tool_arguments(self, task: MemberCTask, capability: str) -> dict[str, Any]:
@@ -330,7 +376,8 @@ class MemberCWorkflowExecutor:
             f"material_kind={material_kind}\n"
             f"goal={task.goal}\n"
             "Output language: Chinese. Use only facts in grounded_context. Do not invent metrics, "
-            "publications, technical stacks, advisor works, or contact details.\n"
+            "publications, technical stacks, advisor works, or contact details. Do not upgrade "
+            "participation into leadership: preserve distinctions such as 参与、负责、主导 and 独立完成.\n"
             f"rules={json.dumps(task.generation_rules, ensure_ascii=False)}\n"
             f"request={json.dumps(task.request_details, ensure_ascii=False)}\n"
             f"grounded_context={json.dumps(collected, ensure_ascii=False)}"
@@ -340,13 +387,17 @@ class MemberCWorkflowExecutor:
         self,
         title: str,
         content: str,
-        review: AgentResult | None,
         decision: CriticDecision | None,
+        revision_applied: bool,
+        revision_preserved: bool,
     ) -> str:
-        review_output = review.output if review else "Critic was not executed."
-        if decision and not decision.passed:
-            review_output += "\nRevision: one bounded rewrite was applied."
-        return f"## {title}\n{content}\n\n## \u8d28\u91cf\u68c0\u67e5\n{review_output}"
+        suggestions = _format_user_actions(
+            decision,
+            revision_applied,
+            revision_preserved,
+        )
+        material = f"## {title}\n{_normalize_generated_content(content, '')}"
+        return f"{material}\n\n## 建议\n{suggestions}" if suggestions else material
 
 
 def _json_summary(value: Any, limit: int = 420) -> str:
@@ -356,6 +407,220 @@ def _json_summary(value: Any, limit: int = 420) -> str:
 
 def _elapsed_ms(started: float) -> int:
     return max(0, round((perf_counter() - started) * 1000))
+
+
+def _sanitize_user_content(content: str) -> str:
+    content = re.sub(
+        r"\s*\[DashScope fallback:\s*[^\]]+\]\s*$",
+        "",
+        content,
+        flags=re.IGNORECASE,
+    )
+    return re.sub(
+        r"\bpending\b",
+        "【待补充：真实量化结果】",
+        content,
+        flags=re.IGNORECASE,
+    ).strip()
+
+
+def _normalize_generated_content(content: str, goal: str) -> str:
+    sanitized = _sanitize_user_content(content)
+    if goal == "generate_advisor_email":
+        return _normalize_email_markdown(sanitized)
+    if goal == "generate_resume_highlights":
+        return _normalize_resume_markdown(sanitized)
+    if goal == "generate_interview":
+        return _normalize_interview_markdown(sanitized)
+    return sanitized
+
+
+def _normalize_email_markdown(content: str) -> str:
+    match = re.match(r"^(尊敬的[^：:\n]+)[：:]\s*(.*)$", content, flags=re.DOTALL)
+    if not match:
+        return content
+
+    salutation = match.group(1).strip()
+    if salutation.endswith("您好"):
+        salutation = salutation[:-2].rstrip()
+    body = re.sub(r"^您好[！!，,\s]*", "", match.group(2).strip())
+    for paragraph_start in (
+        "在科研实践中",
+        "在项目实践中",
+        "科研方面",
+        "此次致信",
+        "随信附上",
+        "感谢您",
+        "期待能",
+    ):
+        body = re.sub(
+            rf"(?<!\n)\s+(?={paragraph_start})",
+            "\n\n",
+            body,
+        )
+
+    closing_match = re.search(r"\s*此致\s*敬礼[！!]?\s*(.*)$", body, flags=re.DOTALL)
+    signature_text = ""
+    if closing_match:
+        signature_text = closing_match.group(1).strip()
+        body = body[: closing_match.start()].rstrip()
+
+    sections = [f"{salutation}：", "您好！"]
+    if body:
+        sections.append(body)
+    if closing_match:
+        sections.extend(["此致", "敬礼！"])
+        signature = _normalize_email_signature(signature_text)
+        if signature:
+            sections.extend(signature)
+    return "\n\n".join(sections).strip()
+
+
+def _normalize_email_signature(signature: str) -> list[str]:
+    if not signature:
+        return []
+
+    compact = re.sub(r"[|｜]", " ", signature)
+    email_match = re.search(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}", compact)
+    phone_match = re.search(r"(?<!\d)\d[\d-]{6,}\d", compact)
+    date_match = re.search(
+        r"(?:\d{4}\s*年\s*(?:\d{1,2}|X)\s*月\s*(?:\d{1,2}|X)\s*日|\d{4}[-/.](?:\d{1,2}|X)[-/.](?:\d{1,2}|X))",
+        compact,
+        flags=re.IGNORECASE,
+    )
+
+    name_area_end = min(
+        [item.start() for item in (email_match, phone_match, date_match) if item]
+        or [len(compact)]
+    )
+    name_area = re.sub(
+        r"学生|姓名|邮箱|电话|日期|敬上|[：:\s]",
+        "",
+        compact[:name_area_end],
+    )
+    name_match = re.search(r"[\u4e00-\u9fff·]{2,20}", name_area)
+
+    lines: list[str] = []
+    if name_match:
+        lines.append(f"学生：{name_match.group(0)}")
+    if email_match:
+        lines.append(f"邮箱：{email_match.group(0)}")
+    if phone_match:
+        lines.append(f"电话：{phone_match.group(0)}")
+    if date_match:
+        lines.append(f"日期：{date_match.group(0)}")
+    return lines or [signature.strip()]
+
+
+def _normalize_resume_markdown(content: str) -> str:
+    lines = [line.strip() for line in content.splitlines() if line.strip()]
+    source_items = (
+        lines
+        if len(lines) > 1
+        else re.split(r"(?<=[。！？])\s+(?=\S)", lines[0]) if lines else []
+    )
+    items: list[str] = []
+    for source_item in source_items:
+        item = re.sub(
+            r"^(?:[-*+]\s+|\d{1,2}[.、]\s*)",
+            "",
+            source_item.strip(),
+        )
+        if item:
+            items.append(item)
+    if len(items) < 2:
+        return content
+    return "\n".join(f"- {item}" for item in items)
+
+
+_INTERVIEW_HEADINGS = {
+    "项目",
+    "项目经历",
+    "项目追问",
+    "CS基础",
+    "专业基础",
+    "科研",
+    "科研经历",
+    "科研方向",
+    "英语面试",
+    "复盘",
+    "综合复盘",
+    "复盘建议",
+}
+
+
+def _normalize_interview_markdown(content: str) -> str:
+    expanded = re.sub(
+        r"[ \t]+(?=(?:\d{1,2}\.\s+|\d{1,2}、\s*))",
+        "\n",
+        content,
+    )
+    expanded = re.sub(r"(?<=[？?])\s+(?=\S)", "\n", expanded)
+    blocks: list[str] = []
+    question_number = 1
+
+    for raw_line in expanded.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        heading = re.sub(r"^#{1,4}\s*", "", line).rstrip("：:")
+        if heading in _INTERVIEW_HEADINGS:
+            blocks.append(f"### {heading}")
+            continue
+        focus = re.sub(r"^>\s*", "", line)
+        if focus.startswith("考察重点"):
+            blocks.append(f"> {focus}")
+            continue
+        numbered = re.match(r"^(?:(\d{1,2})\.\s+|(\d{1,2})、\s*)(.+)$", line)
+        if numbered:
+            number = int(numbered.group(1) or numbered.group(2))
+            blocks.append(f"{number}. {numbered.group(3).strip()}")
+            question_number = max(question_number, number + 1)
+            continue
+        if line.endswith(("？", "?")):
+            blocks.append(f"{question_number}. {line}")
+            question_number += 1
+            continue
+        blocks.append(line)
+
+    return "\n\n".join(blocks)
+
+
+def _agent_execution_trace(
+    agent: Any,
+    model_task: str,
+    base_reason: str,
+) -> tuple[str, str]:
+    model_name = model_name_for_task(model_task)
+    call = getattr(getattr(agent, "llm", None), "last_call", None)
+    if call is None:
+        return model_name, base_reason
+    model_name = call.model_name or model_name
+    if call.source == "fallback":
+        return model_name, f"{base_reason} Agent SDK fallback: {call.fallback_reason}"
+    return model_name, f"{base_reason} Executed through the shared Agent SDK runtime."
+
+
+def _needs_automatic_revision(decision: CriticDecision) -> bool:
+    return not decision.passed and bool(decision.suggestions)
+
+
+def _agent_used_fallback(agent: Any) -> bool:
+    call = getattr(getattr(agent, "llm", None), "last_call", None)
+    return call is not None and call.source == "fallback"
+
+
+def _format_user_actions(
+    decision: CriticDecision | None,
+    revision_applied: bool,
+    revision_preserved: bool = False,
+) -> str:
+    if decision is None or not decision.user_inputs:
+        return ""
+    return "\n".join(
+        f"{index}. {item}"
+        for index, item in enumerate(decision.user_inputs, 1)
+    )
 
 
 def run_material_email_workflow(
@@ -373,9 +638,16 @@ def run_material_email_workflow(
             advisor=advisor,
             request_details={"purpose": purpose},
             generation_rules=[
-                "Write a polite and restrained Chinese advisor email within 600 Chinese characters.",
+                "Write a focused Chinese advisor email within 600 Chinese characters. It should provide enough evidence about the applicant rather than becoming an overly brief greeting.",
                 "Include salutation, self-introduction, research fit, attachment note, and closing.",
+                "Put the salutation alone on the first line as '尊敬的X老师：', put '您好！' in its own paragraph, and start the self-introduction in the next paragraph.",
+                "In the self-introduction paragraph, include the applicant's university, major, GPA or ranking, English result, one or two relevant core-course grades, and the most representative competition award when those facts exist in grounded_context.",
+                "Use the following paragraph for projects and research experience, so academic background and technical experience are not crowded into one paragraph.",
+                "Describe the applicant's most relevant projects, research contribution, competition or measurable results with concrete details, and explicitly connect those experiences to the advisor's direction.",
+                "Prioritize relevant evidence and organize it into a coherent introduction instead of mechanically copying every resume item.",
+                "Use exact Markdown paragraphs for the closing and signature: put 此致, 敬礼！, 学生：姓名, 邮箱：地址, 电话：号码 and 日期：日期 in separate paragraphs with a blank line between them.",
                 "Use placeholders for missing contact details and never invent facts.",
+                "Omit unavailable optional project details from the body instead of filling the email with placeholders.",
             ],
             references=references,
         )
@@ -395,8 +667,10 @@ def run_resume_highlights_workflow(
             request_details={"target_direction": target_direction},
             generation_rules=[
                 "Write exactly four Chinese resume bullets; each bullet must be at most 100 Chinese characters.",
+                "Write every bullet on its own line and start it with '- '.",
                 "Use an action-method-result-fit structure.",
-                "Mark missing quantitative results as pending instead of inventing metrics.",
+                "Use Chinese placeholders such as 【待补充：项目准确率】 when quantitative results are missing; never invent metrics.",
+                "Keep every required missing fact as an explicit Chinese placeholder so the user can complete it.",
             ],
             references=list(profile.projects),
         )
@@ -422,8 +696,12 @@ def run_statement_workflow(
             },
             generation_rules=[
                 "Write a Chinese personal-statement excerpt within 700 Chinese characters.",
-                "Connect research interest, project evidence, target direction, and future plan.",
+                "Write three or four coherent paragraphs following: academic foundation; key experiences and lessons; research motivation and school fit; future plan.",
+                "Build a complete narrative instead of repeating resume bullets or writing a short advisor email.",
+                "Connect research interest, project evidence, target direction, and future plan, explaining what the applicant learned and why the interest formed.",
+                "Do not include an email salutation, attachment note, contact details, or letter-style closing.",
                 "Do not invent grades, experiments, papers, courses, or tool experience.",
+                "Keep explicit Chinese placeholders for every fact required to make the statement credible but absent from evidence.",
             ],
             references=[target_school, direction],
         )
@@ -449,6 +727,8 @@ def run_interview_workflow(
                 "Generate at most 15 questions in Chinese.",
                 "Use project, CS fundamentals, research, English interview, and review categories.",
                 "Ground project follow-ups in the supplied profile and evidence.",
+                "Add one short 考察重点 for each category, but do not generate full reference answers.",
+                "Write each category as a Markdown ### heading, each 考察重点 as a blockquote, and every question as a numbered item on its own line.",
                 "Do not use a Markdown table.",
             ],
             references=[target_school, direction],

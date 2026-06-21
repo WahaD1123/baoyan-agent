@@ -23,6 +23,7 @@ class MockLLMProvider:
                     "summary": "演示模式的质量检查建议进行一次有依据的修改。",
                     "issues": ["部分表述需要进一步核对证据来源。"],
                     "suggestions": ["仅保留工具上下文中能够验证的事实。"],
+                    "user_inputs": [],
                 }
             )
         if task == "profile":
@@ -235,6 +236,7 @@ class DashScopeProvider:
         self.api_key = settings.llm_api_key
         self.base_url = (settings.llm_base_url or "https://dashscope.aliyuncs.com/compatible-mode/v1").strip()
         self.model = settings.llm_model or "qwen-plus"
+        self.member_c_model = settings.llm_member_c_model
         self.critic_model = settings.llm_critic_model
         self.critic_max_tokens = settings.llm_critic_max_tokens
         self.planner_model = settings.llm_planner_model
@@ -259,7 +261,9 @@ class DashScopeProvider:
             "critic": "你是审查助手。检查输出是否具体、是否有依据、是否有编造风险。",
             "critic_structured": (
                 "你是严格的保研申请材料质量检查员。只返回包含 passed、score、summary、"
-                "issues 和 suggestions 字段的 JSON；除字段名外，所有文字内容必须使用简体中文。"
+                "issues、suggestions 和 user_inputs 字段的 JSON；suggestions 只放模型可依据现有"
+                "证据自动修改的建议，user_inputs 只放必须由用户提供的缺失事实；除字段名外，"
+                "所有文字内容必须使用简体中文。"
             ),
             "workflow_planner": "你是受约束的工作流规划智能体。只能输出符合给定 schema 的 JSON，并且只能选择能力清单中的名称。",
             "school": "你是保研院校规划助手。请基于学生画像和检索证据，给出简短而明确的院校建议。",
@@ -272,10 +276,10 @@ class DashScopeProvider:
             primary_model, max_tokens = self.critic_model, self.critic_max_tokens
         elif task == "workflow_planner":
             primary_model, max_tokens = self.planner_model, self.planner_max_tokens
+        elif task in {"material", "interview"}:
+            primary_model, max_tokens = self.member_c_model, self.member_c_max_tokens
         else:
             primary_model, max_tokens = self.model, None
-        if task in {"material", "interview"}:
-            max_tokens = self.member_c_max_tokens
         try:
             return self._request(prompt, task, system_prompts, primary_model, max_tokens)
         except (httpx.HTTPError, KeyError, IndexError, json.JSONDecodeError) as exc:
@@ -347,6 +351,8 @@ def model_name_for_task(task: str) -> str:
         return settings.llm_critic_model
     if task == "workflow_planner":
         return settings.llm_planner_model
+    if task in {"material", "interview"}:
+        return settings.llm_member_c_model
     return settings.llm_model or "qwen-plus"
 
 

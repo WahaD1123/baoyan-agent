@@ -1069,6 +1069,24 @@ summary {
   color: rgba(251, 250, 243, 0.58);
 }
 
+.materialQuality {
+  border-top: 1px solid #e1ded3;
+  margin-top: 18px;
+  padding-top: 12px;
+}
+
+.materialQuality summary {
+  color: #4f5f38;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.materialQuality .markdownBody {
+  min-height: 0;
+  padding-top: 14px;
+}
+
 .compactList strong,
 .compactList span,
 .evidenceList strong,

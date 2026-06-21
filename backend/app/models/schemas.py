@@ -95,6 +95,7 @@ class CriticDecision(BaseModel):
     summary: str
     issues: list[str] = Field(default_factory=list, max_length=3)
     suggestions: list[str] = Field(default_factory=list, max_length=3)
+    user_inputs: list[str] = Field(default_factory=list, max_length=5)
 
 
 class ToolCallTrace(BaseModel):

@@ -31,13 +31,35 @@ class JsonStore:
             rank_percent=8,
             gpa=3.82,
             english_score="CET-6 523",
-            research_interests=["机器学习", "智能体系统"],
-            projects=["多智能体保研助手", "课程推荐系统"],
-            competitions=["蓝桥杯省级奖项"],
-            publications=["A类会议论文二作 1 篇"],
+            research_interests=["机器学习", "大模型智能体", "AI系统"],
+            projects=[
+                (
+                    "多智能体保研助手：负责申请材料生成与模拟面试模块；使用 Python、FastAPI、React、"
+                    "OpenAI Agents SDK 和 MCP Streamable HTTP；实现受约束 Planner→MCP Tool→Generate→"
+                    "Critic→Revise 工作流，提供导师邮件、简历亮点、个人陈述和面试题 4 类输出；"
+                    "C 模块 11 项自动化测试通过。"
+                ),
+                (
+                    "课程推荐系统：使用 Python、Pandas、scikit-learn，基于 TF-IDF 课程文本特征与"
+                    "余弦相似度完成内容推荐；清洗 1200 条匿名选课记录，离线 Top-5 命中率 78%，"
+                    "较热门课程基线提升 12 个百分点；负责数据清洗、特征工程、接口封装与评估。"
+                ),
+            ],
+            competitions=["2025 年第十六届蓝桥杯 Python 程序设计大学 B 组省级二等奖"],
+            publications=[
+                (
+                    "AAAI 2026 论文《Tool-Grounded Planning for Reliable Multi-Agent Assistants》"
+                    "第二作者；负责基线复现、消融实验、错误案例分析与实验章节撰写；"
+                    "主要方法在内部测试集的任务成功率较基线提升 8.6 个百分点。"
+                )
+            ],
             target_regions=["上海", "北京"],
             preferred_schools=["上海交通大学", "浙江大学"],
-            notes="希望申请人工智能系统与智能体方向。",
+            notes=(
+                "核心课程：机器学习 93 分、数据结构 91 分、操作系统 89 分。"
+                "常用邮箱 zhangsan.demo@example.com，联系电话 138-0000-0000。"
+                "计划申请上海交通大学人工智能方向王老师课题组，关注可信智能体与 AI 系统。"
+            ),
         )
 
     def _sample_documents(self) -> list[Document]:

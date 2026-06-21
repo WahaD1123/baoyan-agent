@@ -16,6 +16,24 @@ def test_health() -> None:
     assert response.json()["status"] == "ok"
 
 
+def test_sample_profile_contains_grounded_member_c_evidence() -> None:
+    profile = client.get("/api/profile").json()
+    evidence = " ".join(
+        [
+            *profile["projects"],
+            *profile["competitions"],
+            *profile["publications"],
+            profile["notes"],
+        ]
+    )
+
+    assert "FastAPI" in evidence
+    assert "MCP" in evidence
+    assert "省级二等奖" in evidence
+    assert "第二作者" in evidence
+    assert "实验" in evidence
+
+
 def test_mock_planning_workflow() -> None:
     profile = client.get("/api/profile").json()
     response = client.post("/api/planning/generate", json={"profile": profile})

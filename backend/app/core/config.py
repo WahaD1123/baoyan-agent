@@ -35,6 +35,10 @@ class Settings:
         self.mcp_server_url = os.getenv("MCP_SERVER_URL", "http://127.0.0.1:8002/mcp")
         self.mcp_timeout_seconds = _env_float("MCP_TIMEOUT_SECONDS", 8.0)
         self.mcp_local_fallback = _env_bool("MCP_LOCAL_FALLBACK", True)
+        self.llm_member_c_model = os.getenv("LLM_MEMBER_C_MODEL", "qwen3.6-flash")
+        self.llm_member_c_timeout_seconds = _env_float(
+            "LLM_MEMBER_C_TIMEOUT_SECONDS", 45.0
+        )
         self.llm_member_c_fallback_model = os.getenv("LLM_MEMBER_C_FALLBACK_MODEL", "qwen3.6-flash")
         self.llm_member_c_max_tokens = _env_int("LLM_MEMBER_C_MAX_TOKENS", 1200)
         self.load_sample_data = _env_bool("LOAD_SAMPLE_DATA", False)

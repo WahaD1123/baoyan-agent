@@ -11,19 +11,19 @@ def new_id(prefix: str) -> str:
 
 class StudentProfile(BaseModel):
     id: str = Field(default_factory=lambda: new_id("profile"))
-    name: str = "Demo Student"
-    university: str = "Xiamen University"
-    major: str = "Computer Science"
+    name: str = "张三"
+    university: str = "厦门大学"
+    major: str = "计算机科学与技术"
     rank_percent: float = Field(default=10, ge=0, le=100)
     gpa: float = Field(default=3.7, ge=0, le=4.5)
     english_score: str = "CET-6 500"
     target_degree: str = "master"
     risk_preference: Literal["conservative", "balanced", "aggressive"] = "balanced"
-    research_interests: list[str] = Field(default_factory=lambda: ["AI", "systems"])
+    research_interests: list[str] = Field(default_factory=lambda: ["机器学习", "智能体系统"])
     projects: list[str] = Field(default_factory=list)
     competitions: list[str] = Field(default_factory=list)
     publications: list[str] = Field(default_factory=list)
-    target_regions: list[str] = Field(default_factory=lambda: ["Shanghai", "Beijing"])
+    target_regions: list[str] = Field(default_factory=lambda: ["上海", "北京"])
     preferred_schools: list[str] = Field(default_factory=list)
     notes: str = ""
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -150,6 +150,11 @@ class ProfileAnalysis(BaseModel):
     summary: str = ""
 
 
+class EvidenceReference(BaseModel):
+    title: str
+    url: str = ""
+
+
 class SchoolRecommendation(BaseModel):
     school_name: str
     program_name: str
@@ -158,10 +163,11 @@ class SchoolRecommendation(BaseModel):
     reasons: list[str] = Field(default_factory=list)
     risks: list[str] = Field(default_factory=list)
     todo: list[str] = Field(default_factory=list)
-    evidence: list[str] = Field(default_factory=list)
+    evidence: list[EvidenceReference] = Field(default_factory=list)
     materials: list[str] = Field(default_factory=list)
     exam_format: list[str] = Field(default_factory=list)
     deadline: str = ""
+    notice_url: str = ""
     agent_insight: str = ""
 
 

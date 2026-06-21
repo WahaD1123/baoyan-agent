@@ -1,4 +1,5 @@
 import { Section } from "../components/Section";
+import { MarkdownContent } from "../components/MarkdownContent";
 import type { ProfileAnalysis, SchoolRecommendation, StudentProfile } from "../types/domain";
 
 type Props = {
@@ -28,11 +29,13 @@ export function PlanningPage({
   loading,
   onGenerate,
 }: Props) {
+  const description = `${profile.name} / Top ${profile.rank_percent}% / ${profile.research_interests.join("、") || "待补充方向"}`;
+
   return (
     <Section
       title="院校规划"
       eyebrow="第 2 步"
-      description={`${profile.name} / Top ${profile.rank_percent}% / ${profile.research_interests.join("、") || "待补充方向"}`}
+      description={description}
       actions={<button onClick={onGenerate}>{loading ? "生成中..." : "生成我的规划"}</button>}
     >
       <div className="planningHero">
@@ -41,7 +44,7 @@ export function PlanningPage({
             <h3>规划摘要</h3>
             <span>面向申请决策</span>
           </div>
-          <pre>{plan}</pre>
+          <MarkdownContent content={plan} className="markdownAnswer" />
         </div>
         <div className="panel accentPanel">
           <h3>核心判断</h3>
@@ -50,7 +53,14 @@ export function PlanningPage({
               <li>综合竞争力：{analysis.overall_score} 分</li>
               <li>学业基础：{analysis.academic_score} 分</li>
               <li>科研与方向支撑：{analysis.research_score} 分</li>
-              <li>建议策略：{profile.risk_preference === "aggressive" ? "冲刺优先" : profile.risk_preference === "conservative" ? "稳妥优先" : "平衡推进"}</li>
+              <li>
+                建议策略：
+                {profile.risk_preference === "aggressive"
+                  ? "冲刺优先"
+                  : profile.risk_preference === "conservative"
+                    ? "稳妥优先"
+                    : "平衡推进"}
+              </li>
             </ul>
           ) : (
             <p className="emptyText">先在个人背景页完成分析，这里会自动带出判断依据。</p>
@@ -139,10 +149,16 @@ export function PlanningPage({
               ) : null}
               {item.evidence.length ? (
                 <div className="recommendationSection">
-                  <h4>建议依据</h4>
+                  <h4>参考资料</h4>
                   <div className="tagRow">
                     {item.evidence.map((source) => (
-                      <span key={source}>{source}</span>
+                      source.url ? (
+                        <a key={source.title} href={source.url} target="_blank" rel="noreferrer">
+                          {source.title}
+                        </a>
+                      ) : (
+                        <span key={source.title}>{source.title}</span>
+                      )
                     ))}
                   </div>
                 </div>
@@ -165,7 +181,7 @@ export function PlanningPage({
             ))}
           </ol>
         ) : (
-          <p className="emptyText">生成规划后，这里会展示分周准备建议。</p>
+          <p className="emptyText">生成规划后，这里会显示分周准备建议。</p>
         )}
       </div>
     </Section>

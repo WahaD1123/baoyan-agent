@@ -5,6 +5,7 @@ from time import perf_counter
 from typing import Any
 
 from app.agents import CriticAgent, InterviewAgent, MaterialAgent
+from app.agents_sdk.member_c import build_member_c_agent_llm
 from app.models import (
     Advisor,
     AgentResult,
@@ -47,9 +48,12 @@ class MemberCWorkflowExecutor:
     ) -> None:
         self.planner = planner or TaskPlanner(build_member_c_registry())
         self.mcp_client = mcp_client or MemberCMCPClient()
-        self.material_agent = material_agent or MaterialAgent()
-        self.interview_agent = interview_agent or InterviewAgent()
-        self.critic_agent = critic_agent or CriticAgent()
+        default_llm = None
+        if material_agent is None or interview_agent is None or critic_agent is None:
+            default_llm = build_member_c_agent_llm()
+        self.material_agent = material_agent or MaterialAgent(llm=default_llm)
+        self.interview_agent = interview_agent or InterviewAgent(llm=default_llm)
+        self.critic_agent = critic_agent or CriticAgent(llm=default_llm)
 
     def execute(self, task: MemberCTask) -> WorkflowRun:
         plan_context = {

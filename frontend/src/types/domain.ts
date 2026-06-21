@@ -125,6 +125,11 @@ export type ProfileAnalysis = {
   summary: string;
 };
 
+export type EvidenceReference = {
+  title: string;
+  url: string;
+};
+
 export type SchoolRecommendation = {
   school_name: string;
   program_name: string;
@@ -133,9 +138,10 @@ export type SchoolRecommendation = {
   reasons: string[];
   risks: string[];
   todo: string[];
-  evidence: string[];
+  evidence: EvidenceReference[];
   materials: string[];
   exam_format: string[];
   deadline: string;
+  notice_url: string;
   agent_insight: string;
 };

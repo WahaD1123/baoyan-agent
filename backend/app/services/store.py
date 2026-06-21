@@ -25,14 +25,19 @@ class JsonStore:
 
     def _sample_profile(self) -> StudentProfile:
         return StudentProfile(
-            name="Demo Student",
-            university="Xiamen University",
-            major="Computer Science",
+            name="张三",
+            university="厦门大学",
+            major="计算机科学与技术",
             rank_percent=8,
-            research_interests=["machine learning", "agent systems"],
-            projects=["Multi-agent baoyan assistant", "Course recommendation system"],
-            competitions=["Lanqiao Cup provincial prize"],
-            preferred_schools=["Shanghai Jiao Tong University", "Zhejiang University"],
+            gpa=3.82,
+            english_score="CET-6 523",
+            research_interests=["机器学习", "智能体系统"],
+            projects=["多智能体保研助手", "课程推荐系统"],
+            competitions=["蓝桥杯省级奖项"],
+            publications=["A类会议论文二作 1 篇"],
+            target_regions=["上海", "北京"],
+            preferred_schools=["上海交通大学", "浙江大学"],
+            notes="希望申请人工智能系统与智能体方向。",
         )
 
     def _sample_documents(self) -> list[Document]:

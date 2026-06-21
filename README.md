@@ -74,16 +74,17 @@ Do not commit `.env` or paste real keys into code, docs, issues, or chat logs.
 
 ## OpenAI Agents SDK
 
-Member A planning now includes a project-wide OpenAI Agents SDK runtime layer under `backend/app/agents_sdk/`.
-When `AGENT_SDK_ENABLED=true`, the planning workflow uses:
+Members A, B, and C share the project-wide OpenAI Agents SDK runtime under `backend/app/agents_sdk/`.
+When `AGENT_SDK_ENABLED=true`, agent execution uses:
 
 - OpenAI Agents SDK as the orchestration runtime
-- Streamable HTTP MCP tools for planning context collection
+- Streamable HTTP MCP tools for context collection
 - the existing FastAPI API contract for frontend compatibility
 
-If the SDK runtime is disabled or the compatible model call fails, the planning workflow falls back
-to deterministic MCP retrieval plus local summary generation. Health details are exposed through
-`/api/health/llm`.
+Member C keeps its validated Planner and conditional Critic loop while its Material, Interview, and
+Critic agents execute through the shared SDK runtime. If the SDK runtime is disabled or a compatible
+model call fails, Member C falls back once to the existing LLM provider so mock mode remains usable.
+Health details are exposed through `/api/health/llm`.
 
 ## Member B Demo
 
@@ -136,8 +137,8 @@ button / existing API
   -> Pydantic + Capability Registry validation
   -> Workflow Executor
   -> Streamable HTTP MCP tools
-  -> MaterialAgent or InterviewAgent
-  -> structured CriticAgent
+  -> SDK MaterialAgent or SDK InterviewAgent
+  -> SDK structured CriticAgent
   -> at most one conditional revision
   -> persisted Workflow trace
 ```

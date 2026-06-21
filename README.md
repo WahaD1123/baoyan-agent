@@ -1,27 +1,82 @@
 # Baoyan Agent
 
-面向 CS 保研申请场景的多 Agent 中间件系统。项目目标是把用户画像、资料知识库、导师匹配、申请规划、材料生成和模拟面试串成一个可展示的 workflow，而不是普通问答页面。
+面向 CS 保研场景的多 Agent 中间件原型。系统把用户画像、院校规划、知识检索、导师匹配、申请材料和模拟面试组织成可执行、可追踪的工作流，而不是为每个按钮简单封装一次大模型请求。
 
-## Tech Stack
+## 项目亮点
 
-- Backend: FastAPI, Pydantic, in-memory mock services for MVP
-- Frontend: React, Vite, TypeScript
-- AI layer: Mock LLM by default, with an OpenAI-compatible provider reserved
-- Architecture keywords: API Gateway, Agent workflow, RAG, MCP/tool layer, model routing
+- **真实 MCP 互操作**：FastAPI 业务服务通过 Streamable HTTP 调用独立 MCP Server，15 个结构化工具覆盖画像、规划、知识库、导师和面试证据。
+- **统一多 Agent 底座**：A、B、C 三个模块共享 OpenAI Agents SDK 的 `Agent + Runner + Context + Tool` 执行方式。
+- **受约束动态工作流**：C 模块实现 `Planner -> MCP Tool -> Generate -> Critic -> Revise`，计划经过 Pydantic 与能力注册表校验，最多重写一次。
+- **稳定且可解释**：支持 DashScope 与 Mock/本地降级，工作流记录展示计划来源、工具参数与结果摘要、模型路由、耗时和 Critic 决策。
 
-## Quick Start
+这些能力对应了课程关注的 MCP、MAS、规划智能体、Workflow-Task-Capability-Tool、模型路由和反馈闭环，并落实在可运行的保研业务流程中。
 
-Backend:
+## 系统架构
+
+### 技术架构
+
+![系统技术架构](images/架构图.png)
+
+### 功能结构
+
+![系统功能结构](images/结构图.png)
+
+浏览器只访问 FastAPI，MCP 调用发生在两个独立后端进程之间。文档、导师和工作流记录保存为本地 JSON，便于课程演示和复现。
+
+## 快速开始
+
+准备 Python、Node.js、npm 和 PowerShell，然后执行：
 
 ```powershell
+git clone https://github.com/WahaD1123/baoyan-agent.git
+cd baoyan-agent
+
 cd backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
+
+cd ..\frontend
+npm install
+cd ..
+
+Copy-Item .env.example .env
+```
+
+### 配置模型
+
+默认 `.env` 使用 `LLM_PROVIDER=mock`，无需 API Key，可预览界面和内置降级结果。
+
+完整演示 Agent SDK、真实模型路由和 MCP 工作流时，在本地 `.env` 中设置：
+
+```dotenv
+LLM_PROVIDER=dashscope
+DASHSCOPE_API_KEY=your-local-api-key
+LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+LLM_MODEL=qwen3.7-plus
+AGENT_SDK_ENABLED=true
+AGENT_SDK_MODEL=qwen3.7-plus
+
+LLM_PLANNER_MODEL=qwen3.6-flash
+LLM_CRITIC_MODEL=qwen3.6-flash
+LLM_MEMBER_C_MODEL=qwen3.6-flash
+```
+
+不要提交 `.env` 或在代码、文档和日志中保存真实密钥。
+
+### 启动服务
+
+打开三个 PowerShell 终端。
+
+终端 1，启动 FastAPI：
+
+```powershell
+cd backend
+.\.venv\Scripts\Activate.ps1
 uvicorn app.main:app --reload --port 8000
 ```
 
-MCP Server (open a second PowerShell terminal):
+终端 2，启动 MCP Server：
 
 ```powershell
 cd backend
@@ -29,127 +84,53 @@ cd backend
 python -m app.mcp_server
 ```
 
-Backend tests:
+终端 3，启动前端：
+
+```powershell
+cd frontend
+npm run dev
+```
+
+访问 `http://localhost:5173`。MCP 服务地址为 `http://127.0.0.1:8002/mcp`。
+
+## 功能模块
+
+| 模块 | 主要能力 | 代表输出 |
+|---|---|---|
+| A：画像与院校规划 | 画像分析、证据检索、冲稳保推荐、时间线 | 竞争力分析、院校梯度、规划摘要 |
+| B：知识库与导师匹配 | 文本/URL/PDF 入库、检索问答、导师主页解析与匹配 | 引用片段、匹配理由、联系建议 |
+| C：材料与模拟面试 | 受约束规划、材料生成、Critic 审查、条件重写 | 导师邮件、简历亮点、个人陈述、面试题 |
+| Workflow | 统一记录 Planner、Tool、Agent 与 Condition 步骤 | MCP 传输、模型、耗时、状态和降级原因 |
+
+## 推荐演示流程
+
+1. 查看或修改学生画像。
+2. 导入招生通知、经验帖或导师主页，并执行知识问答。
+3. 生成冲刺、稳妥、保底院校规划。
+4. 完成导师匹配并生成导师联系邮件。
+5. 生成简历亮点、个人陈述和模拟面试题。
+6. 打开“执行记录”，展示 Planner、MCP、Agent、Critic 和模型路由链路。
+
+## 测试
+
+后端：
 
 ```powershell
 cd backend
+.\.venv\Scripts\Activate.ps1
 $env:PYTEST_DISABLE_PLUGIN_AUTOLOAD='1'
 python -m pytest
 ```
 
-Frontend:
+前端：
 
 ```powershell
 cd frontend
-npm install
-npm run dev
+npm run build
 ```
 
-Open the app at `http://localhost:5173`. For the complete middleware demo, keep the Backend, MCP Server, and Frontend running at the same time. The frontend can still show mock data when the backend is unavailable, and Member C records an explicit local fallback when the MCP Server is unavailable.
+## 项目文档
 
-## Main Demo Flow
-
-1. Fill in the student profile.
-2. Add admissions notices, experience posts, resume notes, or advisor information to the knowledge base.
-3. Generate a school application plan with multiple Agents.
-4. Match advisors from the knowledge base.
-5. Generate an advisor contact email.
-6. Generate mock interview questions.
-7. Review workflow records to explain the middleware design.
-
-## DashScope
-
-The project runs with Mock LLM by default. To use Alibaba Cloud DashScope locally, create `.env` in the repo root or `backend/`:
-
-```powershell
-LLM_PROVIDER=dashscope
-DASHSCOPE_API_KEY=your-new-local-key
-LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-LLM_MODEL=qwen-vl-max
-AGENT_SDK_ENABLED=true
-AGENT_SDK_MODEL=qwen-vl-max
-```
-
-Do not commit `.env` or paste real keys into code, docs, issues, or chat logs.
-
-## OpenAI Agents SDK
-
-Members A, B, and C share the project-wide OpenAI Agents SDK runtime under `backend/app/agents_sdk/`.
-When `AGENT_SDK_ENABLED=true`, agent execution uses:
-
-- OpenAI Agents SDK as the orchestration runtime
-- Streamable HTTP MCP tools for context collection
-- the existing FastAPI API contract for frontend compatibility
-
-Member C keeps its validated Planner and conditional Critic loop while its Material, Interview, and
-Critic agents execute through the shared SDK runtime. If the SDK runtime is disabled or a compatible
-model call fails, Member C falls back once to the existing LLM provider so mock mode remains usable.
-Health details are exposed through `/api/health/llm`.
-
-## Member B Demo
-
-Member B owns the heterogeneous knowledge module:
-
-1. Add a notice by URL through `/api/knowledge/documents/url`.
-2. Upload a PDF through `/api/knowledge/documents/upload`.
-3. Paste an experience post through `/api/knowledge/documents/text`.
-4. Ask a RAG question through `/api/knowledge/query` and show cited chunks.
-5. Add an advisor homepage through `/api/knowledge/advisors/url`.
-6. Match advisors through `/api/knowledge/advisors/match`.
-
-## Team Guide
-
-Read [docs/TEAM_GUIDE.md](docs/TEAM_GUIDE.md) before adding new modules. Read [docs/API.md](docs/API.md) before changing API contracts.
-
-## One-command Demo
-
-Install backend and frontend dependencies once, then start all three processes from the repository root:
-
-```powershell
-pip install -r backend/requirements.txt
-cd frontend
-npm install
-cd ..
-.\start-demo.ps1
-```
-
-The script starts:
-
-- Frontend: `http://127.0.0.1:5173`
-- FastAPI business service: `http://127.0.0.1:8000`
-- Streamable HTTP MCP server: `http://127.0.0.1:8002/mcp`
-
-Stop every process started by the script with:
-
-```powershell
-.\stop-demo.ps1
-```
-
-The scripts accept `-FrontendPort`, `-BackendPort`, and `-McpPort` when the default ports are occupied. Runtime PID files and logs are written under the ignored `.demo/` directory.
-
-## Member C Middleware Flow
-
-The existing material and interview buttons remain stable API entry points. Internally, each request now runs this constrained dynamic flow:
-
-```text
-button / existing API
-  -> Qwen TaskPlanner
-  -> Pydantic + Capability Registry validation
-  -> Workflow Executor
-  -> Streamable HTTP MCP tools
-  -> SDK MaterialAgent or SDK InterviewAgent
-  -> SDK structured CriticAgent
-  -> at most one conditional revision
-  -> persisted Workflow trace
-```
-
-The Planner may only select registered capabilities and at most eight steps. Required profile, advisor, and knowledge tools are validated from request context. Invalid plans fall back to a deterministic safe plan. The Workflow page exposes the selected plan, MCP transport, arguments and result summaries, model route, duration, Critic decision, and revision status.
-
-Manual MCP startup:
-
-```powershell
-cd backend
-python -m app.mcp_server
-```
-
-When the MCP service is unavailable, Member C can use the same allow-listed local tool implementations if `MCP_LOCAL_FALLBACK=true`. A trace explicitly records `local_fallback`; it is never presented as a successful MCP network call.
+- API：`docs/API.md`
+- 架构：`docs/ARCHITECTURE.md`
+- 团队分工：`docs/TEAM_GUIDE.md`
